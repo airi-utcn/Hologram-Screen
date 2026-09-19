@@ -1,0 +1,348 @@
+{
+  "name": "pe_warmup",
+  "title": "Warm-up and exercises (PE)",
+  "scenario": "gym",
+  "summary": "A whole class in motion: laps, then exercise after exercise, each shown by the teacher first. Every limb moves, so every gesture has to arrive intact.",
+  "duration": 150,
+  "horizon_s": 4.0,
+  "viewer": {
+    "seat": [
+      9.0,
+      2.4,
+      6.5
+    ],
+    "glances_per_minute": 1,
+    "seed": 11
+  },
+  "phase_weights": {
+    "exercise": {
+      "athlete": 1.3
+    },
+    "demo": {
+      "instructor": 1.4
+    }
+  },
+  "steps": [
+    {
+      "t": 0,
+      "phase": "intro",
+      "caption": "The PE teacher blows her whistle. The class stands in three rows, facing her.",
+      "speaker": "instructor",
+      "focus": [
+        "instructor"
+      ],
+      "actions": {
+        "instructor": {
+          "gesture": "whistle"
+        }
+      }
+    },
+    {
+      "t": 5,
+      "phase": "intro",
+      "caption": "\"Warm-up first: two laps around the hall!\"",
+      "speaker": "instructor",
+      "focus": [
+        "instructor"
+      ],
+      "actions": {
+        "instructor": {
+          "gesture": "wave"
+        }
+      }
+    },
+    {
+      "t": 9,
+      "phase": "exercise",
+      "caption": "The class jogs two laps. Watch the legs and arms swing as they run.",
+      "speaker": "instructor",
+      "focus": [
+        "@athletes"
+      ],
+      "actions": {
+        "@athletes": {
+          "laps": {
+            "centre": [
+              0,
+              0.7
+            ],
+            "radius": 6.5,
+            "speed": 3.0
+          }
+        },
+        "instructor": {
+          "gesture": "clap"
+        }
+      },
+      "viewer_to": [
+        10.5,
+        2.6,
+        8.0
+      ]
+    },
+    {
+      "t": 38,
+      "phase": "exercise",
+      "caption": "Back to their places, walking.",
+      "speaker": "instructor",
+      "focus": [
+        "@athletes"
+      ],
+      "actions": {
+        "@athletes": {
+          "walk_to": "home"
+        },
+        "instructor": {
+          "gesture": "none"
+        }
+      },
+      "viewer_to": [
+        9.0,
+        2.4,
+        6.5
+      ]
+    },
+    {
+      "t": 45,
+      "phase": "demo",
+      "caption": "The teacher demonstrates the first exercise: jumping jacks. Arms over the head, feet apart, then together again.",
+      "speaker": "instructor",
+      "focus": [
+        "instructor"
+      ],
+      "actions": {
+        "instructor": {
+          "exercise": "jumping_jacks"
+        }
+      }
+    },
+    {
+      "t": 51,
+      "phase": "exercise",
+      "caption": "Everyone joins in, in time with her claps.",
+      "speaker": "instructor",
+      "focus": [
+        "@athletes"
+      ],
+      "actions": {
+        "@athletes": {
+          "exercise": "jumping_jacks"
+        },
+        "instructor": {
+          "exercise": "none",
+          "gesture": "clap"
+        }
+      }
+    },
+    {
+      "t": 61,
+      "phase": "exercise",
+      "caption": "Arm circles: arms straight out to the sides, small circles.",
+      "speaker": "instructor",
+      "focus": [
+        "@athletes"
+      ],
+      "actions": {
+        "@people": {
+          "exercise": "arm_circles"
+        },
+        "instructor": {
+          "gesture": "none"
+        }
+      }
+    },
+    {
+      "t": 69,
+      "phase": "exercise",
+      "caption": "Squats: hips back, knees bent, arms forward for balance.",
+      "speaker": "instructor",
+      "focus": [
+        "@athletes"
+      ],
+      "actions": {
+        "@people": {
+          "exercise": "squats"
+        },
+        "athlete_5": {
+          "exercise": "squats",
+          "depth": 0.45
+        }
+      }
+    },
+    {
+      "t": 77,
+      "phase": "correction",
+      "caption": "One student is not going low enough. The teacher walks over and points it out.",
+      "speaker": "instructor",
+      "focus": [
+        "athlete_5",
+        "instructor"
+      ],
+      "actions": {
+        "instructor": {
+          "exercise": "none",
+          "walk_to": [
+            -1.4,
+            -0.5
+          ],
+          "gesture": "point",
+          "at": "athlete_5"
+        }
+      },
+      "viewer_to": [
+        3.0,
+        2.2,
+        3.5
+      ]
+    },
+    {
+      "t": 84,
+      "phase": "correction",
+      "caption": "She shows him how deep to go: thighs level with the floor.",
+      "speaker": "instructor",
+      "focus": [
+        "instructor",
+        "athlete_5"
+      ],
+      "actions": {
+        "instructor": {
+          "exercise": "squats",
+          "gesture": "none",
+          "face": "athlete_5"
+        }
+      }
+    },
+    {
+      "t": 91,
+      "phase": "correction",
+      "caption": "Now he gets it right, and she claps for him.",
+      "speaker": "athlete_5",
+      "focus": [
+        "athlete_5"
+      ],
+      "actions": {
+        "athlete_5": {
+          "exercise": "squats",
+          "depth": 1.0
+        },
+        "instructor": {
+          "exercise": "none",
+          "gesture": "clap",
+          "face": "athlete_5"
+        }
+      }
+    },
+    {
+      "t": 98,
+      "phase": "exercise",
+      "caption": "High knees, fast! Knees up to the hips.",
+      "speaker": "instructor",
+      "focus": [
+        "@athletes"
+      ],
+      "actions": {
+        "@athletes": {
+          "exercise": "high_knees"
+        },
+        "instructor": {
+          "walk_to": "home",
+          "gesture": "none",
+          "face": "none"
+        }
+      },
+      "viewer_to": [
+        9.0,
+        2.4,
+        6.5
+      ]
+    },
+    {
+      "t": 106,
+      "phase": "exercise",
+      "caption": "Lunges, alternating legs, hands on the hips.",
+      "speaker": "instructor",
+      "focus": [
+        "@athletes"
+      ],
+      "actions": {
+        "@people": {
+          "exercise": "lunges"
+        }
+      }
+    },
+    {
+      "t": 116,
+      "phase": "exercise",
+      "caption": "Stretching: reach down towards the toes.",
+      "speaker": "instructor",
+      "focus": [
+        "@athletes"
+      ],
+      "actions": {
+        "@people": {
+          "exercise": "toe_touch"
+        }
+      }
+    },
+    {
+      "t": 124,
+      "phase": "exercise",
+      "caption": "Side stretch: one arm over the head, lean to the other side.",
+      "speaker": "instructor",
+      "focus": [
+        "@athletes"
+      ],
+      "actions": {
+        "@people": {
+          "exercise": "side_stretch"
+        }
+      }
+    },
+    {
+      "t": 133,
+      "phase": "exercise",
+      "caption": "Cool down: arms up and breathe in... arms down and breathe out.",
+      "speaker": "instructor",
+      "focus": [
+        "@athletes"
+      ],
+      "actions": {
+        "@people": {
+          "exercise": "reach_up"
+        }
+      }
+    },
+    {
+      "t": 141,
+      "phase": "outro",
+      "caption": "Well done! Everyone claps.",
+      "speaker": "instructor",
+      "focus": [
+        "@people"
+      ],
+      "actions": {
+        "@people": {
+          "exercise": "none",
+          "gesture": "clap"
+        }
+      }
+    },
+    {
+      "t": 146,
+      "phase": "outro",
+      "caption": "\"See you next week!\"",
+      "speaker": "instructor",
+      "focus": [
+        "instructor"
+      ],
+      "actions": {
+        "@athletes": {
+          "gesture": "none"
+        },
+        "instructor": {
+          "gesture": "wave"
+        }
+      }
+    }
+  ]
+}

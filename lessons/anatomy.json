@@ -1,0 +1,152 @@
+{
+  "name": "anatomy",
+  "title": "The heart as a pump (lecture)",
+  "scenario": "classroom",
+  "summary": "A lecture that keeps pointing at models around the room: large head turns the plan can see coming.",
+  "duration": 52,
+  "horizon_s": 4.0,
+  "viewer": {
+    "seat": [
+      0.2,
+      1.62,
+      3.0
+    ],
+    "glances_per_minute": 3,
+    "seed": 7
+  },
+  "phase_weights": {
+    "lecture": {
+      "instructor": 1.3
+    },
+    "question": {
+      "student": 1.4
+    }
+  },
+  "steps": [
+    {
+      "t": 0,
+      "phase": "lecture",
+      "caption": "The lecture begins: today, the heart as a pump.",
+      "speaker": "instructor",
+      "focus": [
+        "instructor"
+      ],
+      "actions": {
+        "instructor": {
+          "gesture": "none"
+        }
+      }
+    },
+    {
+      "t": 5,
+      "phase": "lecture",
+      "caption": "The teacher draws the four chambers of the heart on the board and labels them.",
+      "speaker": "instructor",
+      "focus": [
+        "annotation_layer"
+      ],
+      "actions": {
+        "instructor": {
+          "write": "annotation_layer"
+        }
+      },
+      "states": {
+        "annotation_layer": "sketch"
+      }
+    },
+    {
+      "t": 14,
+      "phase": "lecture",
+      "caption": "She walks over and points at the anatomical model on the left.",
+      "speaker": "instructor",
+      "focus": [
+        "anatomical_model"
+      ],
+      "actions": {
+        "instructor": {
+          "walk_to": [
+            -4.9,
+            -3.6
+          ],
+          "gesture": "point"
+        }
+      }
+    },
+    {
+      "t": 21,
+      "phase": "lecture",
+      "caption": "Then she crosses the room to compare it with the engineered pump on the right.",
+      "speaker": "instructor",
+      "focus": [
+        "cad_assembly"
+      ],
+      "actions": {
+        "instructor": {
+          "walk_to": [
+            4.7,
+            -3.6
+          ],
+          "gesture": "point"
+        }
+      }
+    },
+    {
+      "t": 28,
+      "phase": "question",
+      "caption": "A student raises a hand: how do the valves stop blood flowing backwards?",
+      "speaker": "student_3",
+      "focus": [
+        "student_3"
+      ],
+      "actions": {
+        "instructor": {
+          "gesture": "none"
+        },
+        "student_3": {
+          "gesture": "hand_up"
+        }
+      }
+    },
+    {
+      "t": 33,
+      "phase": "lecture",
+      "caption": "She answers at the bench: the red flap is the valve, and it only opens one way.",
+      "speaker": "instructor",
+      "focus": [
+        "instrument_1"
+      ],
+      "actions": {
+        "student_3": {
+          "gesture": "none"
+        },
+        "instructor": {
+          "walk_to": [
+            -1.5,
+            -3.5
+          ],
+          "gesture": "point"
+        }
+      },
+      "states": {
+        "instrument_1": "valve"
+      }
+    },
+    {
+      "t": 40,
+      "phase": "lecture",
+      "caption": "Back at the board, she writes a summary next to the sketch.",
+      "speaker": "instructor",
+      "focus": [
+        "annotation_layer"
+      ],
+      "actions": {
+        "instructor": {
+          "write": "annotation_layer"
+        }
+      },
+      "states": {
+        "annotation_layer": "summary"
+      }
+    }
+  ]
+}

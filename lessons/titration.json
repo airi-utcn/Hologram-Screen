@@ -1,0 +1,233 @@
+{
+  "name": "titration",
+  "title": "Acid-base titration (chemistry)",
+  "scenario": "chemistry_lab",
+  "summary": "A demonstration watched from a step behind the crowd: the thing being taught is small and detailed, and classmates' heads are in the way.",
+  "duration": 64,
+  "horizon_s": 4.0,
+  "viewer": {
+    "seat": [
+      0.15,
+      2.1,
+      1.6
+    ],
+    "glances_per_minute": 3,
+    "seed": 3
+  },
+  "boosts": {
+    "speaker": 2.0,
+    "focus": 2.5,
+    "occluder": 1.6
+  },
+  "phase_weights": {
+    "demo": {
+      "demo": 1.3,
+      "apparatus": 1.3
+    },
+    "question": {
+      "student": 1.4
+    },
+    "wrap_up": {
+      "content": 1.3
+    }
+  },
+  "steps": [
+    {
+      "t": 0,
+      "phase": "intro",
+      "caption": "The teacher writes today's reaction on the board: hydrochloric acid neutralised by sodium hydroxide.",
+      "speaker": "instructor",
+      "focus": [
+        "annotation_layer"
+      ],
+      "actions": {
+        "instructor": {
+          "write": "annotation_layer"
+        }
+      },
+      "states": {
+        "annotation_layer": "intro"
+      }
+    },
+    {
+      "t": 13,
+      "phase": "demo",
+      "caption": "She pours the acid into the flask and adds a few drops of indicator.",
+      "speaker": "instructor",
+      "focus": [
+        "reaction_demo"
+      ],
+      "actions": {
+        "instructor": {
+          "walk_to": [
+            0.0,
+            -4.15
+          ],
+          "gesture": "point"
+        }
+      },
+      "states": {
+        "reaction_demo": "indicator"
+      }
+    },
+    {
+      "t": 20,
+      "phase": "demo",
+      "caption": "She opens the burette tap. The base drips in and the liquid slowly turns faintly pink.",
+      "speaker": "instructor",
+      "focus": [
+        "burette_demo"
+      ],
+      "actions": {
+        "instructor": {
+          "gesture": "point"
+        }
+      },
+      "states": {
+        "burette_demo": "dripping",
+        "reaction_demo": "pinkish"
+      }
+    },
+    {
+      "t": 27,
+      "phase": "question",
+      "caption": "A student raises a hand: why does the colour change so suddenly at the end?",
+      "speaker": "student_2",
+      "focus": [
+        "student_2"
+      ],
+      "actions": {
+        "instructor": {
+          "gesture": "none"
+        },
+        "student_2": {
+          "gesture": "hand_up"
+        }
+      }
+    },
+    {
+      "t": 32,
+      "phase": "demo",
+      "caption": "The end point: the flask turns bright pink. She closes the tap and explains that all the acid is now used up.",
+      "speaker": "instructor",
+      "focus": [
+        "reaction_demo"
+      ],
+      "actions": {
+        "instructor": {
+          "gesture": "point"
+        },
+        "student_2": {
+          "gesture": "none"
+        }
+      },
+      "states": {
+        "reaction_demo": "endpoint",
+        "burette_demo": "default"
+      }
+    },
+    {
+      "t": 38,
+      "phase": "demo",
+      "caption": "Next she heats the mixture. Steam rises and condenses in the condenser.",
+      "speaker": "instructor",
+      "focus": [
+        "condenser_demo"
+      ],
+      "actions": {
+        "instructor": {
+          "gesture": "point"
+        }
+      },
+      "states": {
+        "reaction_demo": "heated",
+        "condenser_demo": "vapour"
+      }
+    },
+    {
+      "t": 45,
+      "phase": "demo",
+      "caption": "Everyone steps closer to look at the final solution.",
+      "speaker": "instructor",
+      "focus": [
+        "reaction_demo",
+        "burette_demo"
+      ],
+      "actions": {
+        "instructor": {
+          "gesture": "none"
+        },
+        "student_0": {
+          "walk_to": [
+            1.56,
+            -2.41
+          ]
+        },
+        "student_1": {
+          "walk_to": [
+            1.24,
+            -1.96
+          ]
+        },
+        "student_2": {
+          "walk_to": [
+            0.79,
+            -1.64
+          ]
+        },
+        "student_3": {
+          "walk_to": [
+            0.27,
+            -1.47
+          ]
+        },
+        "student_4": {
+          "walk_to": [
+            -0.27,
+            -1.47
+          ]
+        },
+        "student_5": {
+          "walk_to": [
+            -0.79,
+            -1.64
+          ]
+        },
+        "student_6": {
+          "walk_to": [
+            -1.24,
+            -1.96
+          ]
+        },
+        "student_7": {
+          "walk_to": [
+            -1.56,
+            -2.41
+          ]
+        }
+      },
+      "viewer_to": [
+        0.55,
+        1.98,
+        -0.05
+      ]
+    },
+    {
+      "t": 51,
+      "phase": "wrap_up",
+      "caption": "Back at the board, she writes down the result of the titration.",
+      "speaker": "instructor",
+      "focus": [
+        "annotation_layer"
+      ],
+      "actions": {
+        "instructor": {
+          "write": "annotation_layer"
+        }
+      },
+      "states": {
+        "annotation_layer": "result"
+      }
+    }
+  ]
+}

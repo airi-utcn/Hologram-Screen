@@ -1,0 +1,339 @@
+{
+  "name": "pythagoras",
+  "title": "Pythagoras' theorem (maths)",
+  "scenario": "classroom",
+  "summary": "A board-heavy lesson: the teacher writes and draws, a student comes to the board to solve an example, and the class applauds.",
+  "duration": 82,
+  "horizon_s": 4.0,
+  "viewer": {
+    "seat": [
+      0.2,
+      1.62,
+      3.0
+    ],
+    "glances_per_minute": 2,
+    "seed": 13
+  },
+  "phase_weights": {
+    "lecture": {
+      "content": 1.3
+    },
+    "question": {
+      "student": 1.4
+    }
+  },
+  "board": [
+    {
+      "state": "title",
+      "lines": [
+        "PYTHAGORAS' THEOREM"
+      ]
+    },
+    {
+      "state": "triangle",
+      "draw": [
+        [
+          [
+            -2.3,
+            1.2
+          ],
+          [
+            -0.8,
+            1.2
+          ],
+          [
+            -2.3,
+            1.85
+          ],
+          [
+            -2.3,
+            1.2
+          ]
+        ],
+        [
+          [
+            -2.3,
+            1.32
+          ],
+          [
+            -2.18,
+            1.32
+          ],
+          [
+            -2.18,
+            1.2
+          ]
+        ]
+      ],
+      "labels": [
+        [
+          "A",
+          -2.52,
+          1.46
+        ],
+        [
+          "B",
+          -1.62,
+          1.03
+        ],
+        [
+          "C",
+          -1.45,
+          1.58
+        ]
+      ]
+    },
+    {
+      "state": "formula",
+      "lines": [
+        "A^2 + B^2 = C^2"
+      ],
+      "at": [
+        -0.3,
+        1.75
+      ],
+      "colour": "red"
+    },
+    {
+      "state": "example",
+      "lines": [
+        "3^2 + 4^2 = C^2",
+        "9 + 16 = 25"
+      ],
+      "at": [
+        0.9,
+        1.45
+      ],
+      "height": 0.13
+    },
+    {
+      "state": "answer",
+      "lines": [
+        "C = 5"
+      ],
+      "at": [
+        2.35,
+        1.23
+      ],
+      "height": 0.13,
+      "colour": "green"
+    },
+    {
+      "state": "summary",
+      "lines": [
+        "ONLY FOR RIGHT TRIANGLES"
+      ],
+      "at": [
+        -0.3,
+        1.02
+      ],
+      "height": 0.11
+    }
+  ],
+  "steps": [
+    {
+      "t": 0,
+      "phase": "lecture",
+      "caption": "Maths. The teacher writes today's topic on the board.",
+      "speaker": "instructor",
+      "focus": [
+        "annotation_layer"
+      ],
+      "actions": {
+        "instructor": {
+          "write": "annotation_layer"
+        }
+      },
+      "states": {
+        "annotation_layer": "title"
+      }
+    },
+    {
+      "t": 10,
+      "phase": "lecture",
+      "caption": "She draws a right-angled triangle and labels its sides a, b and c.",
+      "speaker": "instructor",
+      "focus": [
+        "annotation_layer"
+      ],
+      "actions": {
+        "instructor": {
+          "write": "annotation_layer"
+        }
+      },
+      "states": {
+        "annotation_layer": "triangle"
+      }
+    },
+    {
+      "t": 20,
+      "phase": "lecture",
+      "caption": "The theorem: a squared plus b squared equals c squared.",
+      "speaker": "instructor",
+      "focus": [
+        "annotation_layer"
+      ],
+      "actions": {
+        "instructor": {
+          "write": "annotation_layer"
+        }
+      },
+      "states": {
+        "annotation_layer": "formula"
+      }
+    },
+    {
+      "t": 28,
+      "phase": "question",
+      "caption": "A student raises a hand: does it work for every triangle?",
+      "speaker": "student_4",
+      "focus": [
+        "student_4"
+      ],
+      "actions": {
+        "student_4": {
+          "gesture": "hand_up"
+        },
+        "instructor": {
+          "gesture": "none",
+          "face": "student_4"
+        }
+      }
+    },
+    {
+      "t": 33,
+      "phase": "lecture",
+      "caption": "\"Only for right-angled ones\", she answers, pointing at the triangle on the board.",
+      "speaker": "instructor",
+      "focus": [
+        "annotation_layer"
+      ],
+      "actions": {
+        "student_4": {
+          "gesture": "none"
+        },
+        "instructor": {
+          "gesture": "point",
+          "at": "annotation_layer",
+          "face": "none"
+        }
+      }
+    },
+    {
+      "t": 39,
+      "phase": "lecture",
+      "caption": "She invites a student to the board to try an example.",
+      "speaker": "instructor",
+      "focus": [
+        "student_1"
+      ],
+      "actions": {
+        "instructor": {
+          "gesture": "wave",
+          "face": "student_1",
+          "walk_to": [
+            -2.9,
+            -4.9
+          ]
+        }
+      }
+    },
+    {
+      "t": 43,
+      "phase": "practice",
+      "caption": "The student comes to the board and writes: 3 squared plus 4 squared...",
+      "speaker": "student_1",
+      "focus": [
+        "annotation_layer",
+        "student_1"
+      ],
+      "actions": {
+        "student_1": {
+          "write": "annotation_layer"
+        },
+        "instructor": {
+          "gesture": "none",
+          "face": "student_1"
+        }
+      },
+      "states": {
+        "annotation_layer": "example"
+      }
+    },
+    {
+      "t": 55,
+      "phase": "practice",
+      "caption": "...9 plus 16 is 25, so c is 5.",
+      "speaker": "student_1",
+      "focus": [
+        "annotation_layer"
+      ],
+      "actions": {
+        "student_1": {
+          "write": "annotation_layer"
+        }
+      },
+      "states": {
+        "annotation_layer": "answer"
+      }
+    },
+    {
+      "t": 63,
+      "phase": "practice",
+      "caption": "Correct! The whole class applauds.",
+      "speaker": "instructor",
+      "focus": [
+        "student_1",
+        "@class"
+      ],
+      "actions": {
+        "@class": {
+          "gesture": "clap"
+        },
+        "instructor": {
+          "gesture": "clap"
+        }
+      }
+    },
+    {
+      "t": 68,
+      "phase": "lecture",
+      "caption": "The student goes back to their seat, and the teacher adds the rule to remember.",
+      "speaker": "instructor",
+      "focus": [
+        "annotation_layer"
+      ],
+      "actions": {
+        "@class": {
+          "gesture": "none"
+        },
+        "student_1": {
+          "walk_to": "home"
+        },
+        "instructor": {
+          "gesture": "none",
+          "face": "none",
+          "write": "annotation_layer"
+        }
+      },
+      "states": {
+        "annotation_layer": "summary"
+      }
+    },
+    {
+      "t": 78,
+      "phase": "lecture",
+      "caption": "End of the lesson.",
+      "speaker": "instructor",
+      "focus": [
+        "instructor"
+      ],
+      "actions": {
+        "instructor": {
+          "gesture": "wave",
+          "face": "viewer"
+        }
+      }
+    }
+  ]
+}
