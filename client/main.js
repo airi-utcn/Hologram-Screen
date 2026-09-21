@@ -1126,7 +1126,7 @@
   // Thumbsticks: right glides, left snap-turns. Snap rather than smooth turning
   // because it is what most people can wear for a whole lesson.
   const _fwd = new THREE.Vector3(), _rgt = new THREE.Vector3();
-  let snapReady = true, lessonReady = true;
+  let snapReady = true, lessonReady = true, faceReady = true;
 
   // Changing the lesson from a headset: the page's own menu is not there to
   // click, so B and Y walk through the lessons without taking the headset off.
@@ -1141,7 +1141,7 @@
   function xrControls(dt) {
     const s = renderer.xr.getSession();
     if (!s) return;
-    let move = null, turn = 0, recentre = false, lesson = 0;
+    let move = null, turn = 0, recentre = false, lesson = 0, face = null;
     for (const src of s.inputSources) {
       const gp = src.gamepad;
       if (!gp || !gp.axes) continue;
@@ -1151,9 +1151,14 @@
       } else if (Math.hypot(ax[0], ax[1]) > 0.15) {
         move = ax;
       }
-      if (gp.buttons && gp.buttons[4] && gp.buttons[4].pressed) recentre = true;
-      if (gp.buttons && gp.buttons[5] && gp.buttons[5].pressed) {
-        lesson = src.handedness === "left" ? -1 : 1;    // Y back, B forward
+      const b = gp.buttons || [];
+      const lower = b[4] && b[4].pressed, upper = b[5] && b[5].pressed;
+      if (src.handedness === "left") {
+        if (lower) face = "info";        // X: what is going on
+        if (upper) face = "menu";        // Y: who do you want to be
+      } else {
+        if (lower) recentre = true;      // A
+        if (upper) lesson = 1;           // B: next lesson
       }
     }
     if (turn && snapReady) { turnRig(-turn * Math.PI / 6); snapReady = false; }
@@ -1168,6 +1173,11 @@
     }
     if (lesson && lessonReady) { stepLesson(lesson); lessonReady = false; }
     if (!lesson) lessonReady = true;
+    if (face && faceReady) {
+      togglePanel(face === "info" ? infoPanel : menuPanel);
+      faceReady = false;
+    }
+    if (!face) faceReady = true;
     if (recentre) roomHome ? home(roomHome[0], roomHome[1]) : home();
   }
 
@@ -1238,6 +1248,377 @@
     tex.needsUpdate = true;
   }
 
+  // ------------------------------------------------------- panels you can point at
+  // The page's own controls are HTML, and HTML is not there once a headset takes
+  // over the screen. These are the same things drawn onto canvases hung in the
+  // room: one that reports what is going on, one you choose your view from.
+  const panels = [];               // every panel, open or not, for picking
+  const raycaster = new THREE.Raycaster();
+
+  function makePanel(cw, ch, metres) {
+    const cv = document.createElement("canvas");
+    cv.width = cw; cv.height = ch;
+    const tex = new THREE.CanvasTexture(cv);
+    const mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(metres, metres * ch / cw),
+      new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthTest: false }));
+    mesh.renderOrder = 998;
+    mesh.visible = false;
+    mesh.userData = { cv, tex, hits: [], hover: null, key: "" };
+    scene.add(mesh);
+    panels.push(mesh);
+    return mesh;
+  }
+
+  // Hang it at arm's length in front of whoever opened it, turned to face them.
+  function placePanel(mesh, dist = 1.4) {
+    readHead();
+    const flat = new THREE.Vector3(headDir.x, 0, headDir.z).normalize();
+    mesh.position.copy(headPos).addScaledVector(flat, dist);
+    mesh.position.y = Math.max(0.7, headPos.y - 0.1);
+    mesh.lookAt(headPos.x, mesh.position.y, headPos.z);
+  }
+
+  // A panel stays put while you look around it, but it should not be left
+  // behind when the lesson or a chosen role walks you across the room. Once it
+  // drifts out of comfortable view it drifts back, slowly enough not to snatch.
+  const _ideal = new THREE.Vector3(), _toPanel = new THREE.Vector3();
+  function keepInView(mesh, dt) {
+    readHead();
+    const flat = _toPanel.set(headDir.x, 0, headDir.z).normalize();
+    _ideal.copy(headPos).addScaledVector(flat, 1.4);
+    _ideal.y = Math.max(0.7, headPos.y - 0.1);
+    const away = _toPanel.copy(mesh.position).sub(headPos);
+    const dist = away.length();
+    const facing = away.normalize().dot(headDir);
+    if (facing < 0.93 || dist > 2.2 || dist < 0.9) mesh.userData.chasing = true;
+    if (mesh.userData.chasing) {
+      mesh.position.lerp(_ideal, 1 - Math.exp(-4 * dt));
+      if (mesh.position.distanceTo(_ideal) < 0.05) mesh.userData.chasing = false;
+    }
+    mesh.lookAt(headPos.x, mesh.position.y, headPos.z);
+  }
+
+  function togglePanel(mesh) {
+    mesh.visible = !mesh.visible;
+    if (mesh.visible) { placePanel(mesh); mesh.userData.key = ""; }
+  }
+
+  function roundBox(g, x, y, w, h, r, fill, stroke) {
+    g.beginPath();
+    g.moveTo(x + r, y);
+    g.arcTo(x + w, y, x + w, y + h, r);
+    g.arcTo(x + w, y + h, x, y + h, r);
+    g.arcTo(x, y + h, x, y, r);
+    g.arcTo(x, y, x + w, y, r);
+    g.closePath();
+    if (fill) { g.fillStyle = fill; g.fill(); }
+    if (stroke) { g.strokeStyle = stroke; g.lineWidth = 3; g.stroke(); }
+  }
+
+  // ------------------------------------------------------- what is going on
+  const infoPanel = makePanel(900, 620, 1.0);
+
+  function drawInfo() {
+    const u = infoPanel.userData, g = u.cv.getContext("2d");
+    const key = [$("capStep").textContent, $("capText").textContent, $("qoe").textContent,
+                 $("liveCount").textContent, $("recv").textContent, role,
+                 policySel.value, bw.value].join("|");
+    if (key === u.key) return;
+    u.key = key;
+    g.clearRect(0, 0, 900, 620);
+    roundBox(g, 0, 0, 900, 620, 26, "rgba(9,13,19,0.92)", "#2c3444");
+
+    g.fillStyle = "#4fb3ff";
+    g.font = "600 26px system-ui, sans-serif";
+    g.fillText($("capStep").textContent.toUpperCase() || "NO LESSON", 36, 58);
+
+    g.fillStyle = "#eef2f8";
+    g.font = "30px system-ui, sans-serif";
+    hudText(g, $("capText").textContent || "Free exploration.", 36, 112, 828, 42, 3);
+
+    const rows = [
+      ["you are", role === "free" ? "free to walk" : role],
+      ["room", scenarioSel.options[scenarioSel.selectedIndex].text],
+      ["what gets sent first", policySel.options[policySel.selectedIndex].text],
+      ["internet speed", bw.value + " Mbit/s"],
+      ["picture quality", $("qoe").textContent + " / 100"],
+      ["people moving smoothly", $("liveCount").textContent],
+      ["data received", $("recv").textContent],
+    ];
+    let y = 270;
+    for (const row of rows) {
+      g.fillStyle = "#9fb0c6";
+      g.font = "24px system-ui, sans-serif";
+      g.fillText(row[0], 36, y);
+      g.fillStyle = "#eef2f8";
+      g.font = "600 24px system-ui, sans-serif";
+      g.textAlign = "right";
+      g.fillText(String(row[1]), 864, y);
+      g.textAlign = "left";
+      y += 44;
+    }
+    u.tex.needsUpdate = true;
+  }
+
+  // ------------------------------------------------------- choose your view
+  const menuPanel = makePanel(900, 760, 1.05);
+  const ROLES = [
+    ["teacher", "Teacher", "stand where the teacher stands and go where they go"],
+    ["student", "Student", "sit in a student place and watch from there"],
+    ["free", "Free", "walk wherever you like"],
+  ];
+
+  function drawMenu() {
+    const u = menuPanel.userData, g = u.cv.getContext("2d");
+    const key = [role, lessonSel.value, u.hover].join("|");
+    if (key === u.key) return;
+    u.key = key;
+    u.hits = [];
+    g.clearRect(0, 0, 900, 760);
+    roundBox(g, 0, 0, 900, 760, 26, "rgba(9,13,19,0.94)", "#2c3444");
+
+    g.fillStyle = "#9fb0c6";
+    g.font = "600 22px system-ui, sans-serif";
+    g.fillText("WHO ARE YOU?", 36, 46);
+
+    let y = 66;
+    for (const r of ROLES) {
+      const on = role === r[0], hot = u.hover === "role:" + r[0];
+      roundBox(g, 30, y, 840, 76, 16,
+               on ? "#4fb3ff" : hot ? "#1d2634" : "rgba(255,255,255,0.04)",
+               on ? "#4fb3ff" : "#2c3444");
+      g.fillStyle = on ? "#08121c" : "#eef2f8";
+      g.font = "600 28px system-ui, sans-serif";
+      g.fillText(r[1], 52, y + 34);
+      g.fillStyle = on ? "rgba(8,18,28,0.75)" : "#9fb0c6";
+      g.font = "21px system-ui, sans-serif";
+      g.fillText(r[2], 52, y + 62);
+      u.hits.push({ y0: y, y1: y + 76, id: "role:" + r[0] });
+      y += 86;
+    }
+
+    y += 22;
+    g.fillStyle = "#9fb0c6";
+    g.font = "600 22px system-ui, sans-serif";
+    g.fillText("LESSON", 36, y);
+    y += 20;
+
+    for (const opt of lessonSel.options) {
+      const on = lessonSel.value === opt.value, hot = u.hover === "lesson:" + opt.value;
+      roundBox(g, 30, y, 840, 48, 12,
+               on ? "#4fb3ff" : hot ? "#1d2634" : "rgba(255,255,255,0.04)", "#2c3444");
+      g.fillStyle = on ? "#08121c" : "#eef2f8";
+      g.font = "600 23px system-ui, sans-serif";
+      g.fillText(opt.text, 52, y + 32);
+      u.hits.push({ y0: y, y1: y + 48, id: "lesson:" + opt.value });
+      y += 56;
+    }
+    u.tex.needsUpdate = true;
+  }
+
+  function runHit(id) {
+    if (!id) return;
+    const bits = id.split(":"), what = bits[0], value = bits[1];
+    if (what === "role") setRole(value);
+    else if (what === "lesson" && lessonSel.value !== value) {
+      lessonSel.value = value;
+      lessonSel.dispatchEvent(new Event("change"));
+    }
+  }
+
+  // Which row a ray lands on. The hit is read off the panel texture, so the same
+  // rows serve a controller in VR and the mouse on the desktop.
+  function pickPanels() {
+    for (const mesh of panels) {
+      if (!mesh.visible) continue;
+      const hit = raycaster.intersectObject(mesh, false)[0];
+      if (!hit || !hit.uv) continue;
+      const u = mesh.userData;
+      const py = (1 - hit.uv.y) * u.cv.height;
+      const row = u.hits.find(r => py >= r.y0 && py <= r.y1);
+      return { mesh, id: row ? row.id : null };
+    }
+    return null;
+  }
+
+  function setHover(got) {
+    for (const mesh of panels) {
+      const want = got && got.mesh === mesh ? got.id : null;
+      mesh.userData.hover = want;
+    }
+    return got;
+  }
+
+  // ------------------------------------------------------- being someone
+  let role = "free";
+  let roleTarget = null;           // the oid we are riding along with
+
+  // You do not see your own head from the inside, so whoever you are standing
+  // in for is hidden while you are them.
+  function showAgain(oid) {
+    const was = oid !== null && oid !== undefined ? people.get(oid) : null;
+    if (was && was.obj3d) was.obj3d.visible = true;
+  }
+
+  // Where would they be looking? A teacher faces the class, a student faces the
+  // person teaching. Done once, when you take the role: turning someone on every
+  // frame is how you make them ill.
+  function whereIs(oid) {
+    const m = meta.get(oid), person = people.get(oid);
+    if (!m) return null;
+    const at = person ? person.obj3d.position : null;
+    return { x: at ? at.x : m.centre[0], z: at ? at.z : m.centre[2] };
+  }
+
+  function faceLikeThem() {
+    // measured from where the role puts you, not from where you happen to be
+    // standing when you choose it -- those point in very different directions
+    const spot = whereIs(roleTarget);
+    if (!spot) return;
+    const want = role === "teacher" ? "student" : "instructor";
+    const at = new THREE.Vector3(); let n = 0;
+    for (const entry of meta) {
+      const m = entry[1];
+      if (m.semantic !== want) continue;
+      const person = people.get(entry[0]);
+      const pos = person ? person.obj3d.position : null;
+      at.x += pos ? pos.x : m.centre[0];
+      at.z += pos ? pos.z : m.centre[2];
+      n++;
+    }
+    if (!n) return;
+    at.divideScalar(n);
+    readHead();
+    const want_yaw = Math.atan2(-(at.x - spot.x), -(at.z - spot.z));
+    if (inVR()) turnRig(want_yaw - Math.atan2(-headDir.x, -headDir.z));
+    else { yaw = want_yaw; pitch = 0; }
+  }
+
+  function setRole(next) {
+    showAgain(roleTarget);
+    role = next;
+    roleTarget = null;
+    if (next !== "free") { takeControl(); findPerson(); faceLikeThem(); }
+    infoPanel.userData.key = "";
+    menuPanel.userData.key = "";
+  }
+
+  // Who to be: the instructor, or a student near the middle of the room, so the
+  // view is a representative one rather than the far corner.
+  function findPerson() {
+    if (roleTarget !== null && meta.has(roleTarget)) return roleTarget;
+    let best = null, bestScore = Infinity;
+    for (const entry of meta) {
+      const oid = entry[0], m = entry[1];
+      if (role === "teacher" && m.semantic !== "instructor") continue;
+      if (role === "student" && m.semantic !== "student") continue;
+      const score = role === "teacher" ? 0 : Math.hypot(m.centre[0], m.centre[2] + 2);
+      if (score < bestScore) { bestScore = score; best = oid; }
+    }
+    roleTarget = best;
+    return best;
+  }
+
+  const _want = new THREE.Vector3();
+  function followRole(dt) {
+    if (role === "free") return;
+    const oid = findPerson();
+    if (oid === null || oid === undefined) return;
+    const person = people.get(oid), m = meta.get(oid);
+    if (!m) return;
+    // re-applied every frame: their point cloud is rebuilt as it streams in
+    if (person && person.obj3d) person.obj3d.visible = false;
+    const at = person ? person.obj3d.position : null;
+    const x = at ? at.x : m.centre[0], z = at ? at.z : m.centre[2];
+    const eyeH = role === "student" ? 1.20 : 1.62;     // seated, or standing
+    const k = 1 - Math.exp(-3 * dt);                   // same speed at any framerate
+
+    if (inVR()) {
+      readHead();
+      // move the floor under the head, allowing for however far the person has
+      // walked out in their own room
+      _want.set(x - (headPos.x - rig.position.x), eyeH - EYE_H,
+                z - (headPos.z - rig.position.z));
+      rig.position.lerp(_want, k);
+    } else {
+      _want.set(x, eyeH, z);
+      camera.position.lerp(_want, k);
+    }
+  }
+
+  // ------------------------------------------------------- pointing at them
+  // In VR each controller carries a thin ray and the trigger presses whatever
+  // it lands on. On the desktop the mouse does the same job, which is also how
+  // these panels can be tested without a headset.
+  const _ndc = new THREE.Vector2();
+  const _rot = new THREE.Matrix4(), _from = new THREE.Vector3(), _dir = new THREE.Vector3();
+
+  const pointers = [0, 1].map(i => {
+    const c = renderer.xr.getController(i);
+    const line = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(
+        [new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, -1)]),
+      new THREE.LineBasicMaterial({ color: 0x4fb3ff, transparent: true, opacity: 0.7 }));
+    line.scale.z = 3;
+    line.visible = false;
+    c.add(line);
+    c.addEventListener("selectstart", () => {
+      const got = aimWith(c);
+      if (got) runHit(got.id);
+    });
+    rig.add(c);                 // controllers live in the same space as the head
+    return c;
+  });
+
+  function aimWith(controller) {
+    _rot.extractRotation(controller.matrixWorld);
+    _from.setFromMatrixPosition(controller.matrixWorld);
+    _dir.set(0, 0, -1).applyMatrix4(_rot).normalize();
+    raycaster.set(_from, _dir);
+    return pickPanels();
+  }
+
+  const anyPanelOpen = () => panels.some(m => m.visible);
+
+  function aimInVR() {
+    let got = null;
+    for (const c of pointers) {
+      c.userData.lineOn = false;
+      if (!got) got = aimWith(c);
+    }
+    setHover(got);
+    for (const c of pointers) c.children[0].visible = anyPanelOpen();
+    return got;
+  }
+
+  function pointerAt(e) {
+    const r = renderer.domElement.getBoundingClientRect();
+    _ndc.set(((e.clientX - r.left) / r.width) * 2 - 1,
+             -((e.clientY - r.top) / r.height) * 2 + 1);
+    raycaster.setFromCamera(_ndc, camera);
+  }
+
+  window.addEventListener("pointermove", e => {
+    if (inVR() || !anyPanelOpen()) return;
+    pointerAt(e);
+    setHover(pickPanels());
+  });
+
+  renderer.domElement.addEventListener("pointerdown", e => {
+    if (inVR() || !anyPanelOpen()) return;
+    pointerAt(e);
+    const got = pickPanels();
+    if (got) { dragging = false; runHit(got.id); }   // a click on a panel is not a look-around
+  });
+
+  window.addEventListener("keydown", e => {
+    if (e.target.tagName === "SELECT" || e.target.tagName === "INPUT") return;
+    const k = e.key.toLowerCase();
+    if (k === "i") togglePanel(infoPanel);
+    if (k === "m") togglePanel(menuPanel);
+  });
+
   // ---------------------------------------------------------------- loop
   let last = performance.now(), lastSent = 0;
   function frame(now) {
@@ -1260,6 +1641,8 @@
       camera.lookAt(camera.position.clone().add(f));
     }
 
+    followRole(dt);
+
     // What the server streams for follows the real eye: in VR that is the
     // headset's own pose, which is the whole point of wearing one here.
     readHead();
@@ -1281,13 +1664,18 @@
     }
     updateListener();
     reapLoops();
-    if (inVR()) drawHud();
+    if (inVR()) { drawHud(); if (anyPanelOpen()) aimInVR(); }
+    for (const mesh of panels) if (mesh.visible) keepInView(mesh, dt);
+    if (infoPanel.visible) drawInfo();
+    if (menuPanel.visible) drawMenu();
     renderer.render(scene, camera);
   }
 
   // for debugging and automated checks: the scene and what is on screen
-  window.__uc7 = { scene, meta, shown, variants, current, clock: () => clock(),
-                   renderer, rig, camera, readHead, headPos, headDir, stepLesson };
+  window.__uc7 = { scene, meta, shown, people, variants, current, clock: () => clock(),
+                   renderer, rig, camera, readHead, headPos, headDir, stepLesson,
+                   infoPanel, menuPanel, togglePanel, runHit,
+                   role: () => role, panelHover: () => menuPanel.userData.hover };
 
   connect();
   renderer.setAnimationLoop(frame);   // three.js swaps in the headset's own clock

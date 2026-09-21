@@ -96,8 +96,21 @@ Inside:
 |---|---|
 | right thumbstick | glide, in the direction you are looking |
 | left thumbstick left/right | snap turn, 30 degrees a step |
+| trigger | press whatever the ray is pointing at |
 | A | stand back where the room puts the viewer |
-| B / Y | next / previous lesson, without taking the headset off |
+| B | next lesson |
+| X | what is going on: lesson, room, policy, speed, quality, data |
+| Y | who do you want to be: teacher, student, or free |
+
+The two panels are the page's own controls, drawn onto canvases and hung in the room, because HTML is not there
+once a headset has the screen. They stay where you put them while you look around, and come back in front of you
+when you walk away or a role carries you off. The same panels answer to the mouse on the desktop, where **I** and
+**M** open them -- which is also how they can be worked on without a headset.
+
+**Being someone.** *Teacher* stands where the instructor stands and goes where they go, facing the class. *Student*
+sits in a student's place, facing whoever is teaching. Both hide the person you are standing in for -- nobody sees
+their own head from the inside -- and both leave turning to you: a lesson that swivels your head for you is how a
+headset becomes unwearable. *Free* is the original: walk where you like.
 
 Snap turning rather than smooth turning, no screen shake during explosions, and no autopilot: a lesson that drags
 the viewer around is unpleasant to wear, so entering VR hands control back to the person. The captions cannot be
