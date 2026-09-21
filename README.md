@@ -56,8 +56,19 @@ The viewer is also a WebXR page, so the same lesson can be watched from inside a
 tracking, and -- the point of doing it at all -- **the headset's own pose is what the server streams for**, so the
 streaming policies react to where the teacher actually looks.
 
-An immersive session needs a secure context. `https://` works; so does plain HTTP on `localhost`, which is the
-easy way with a headset on a cable:
+An immersive session needs a secure context: `https://`, or plain HTTP on `localhost`. Either works.
+
+**Over the network (no cable, no developer account).** The server makes its own certificate, for localhost and for
+whatever addresses this machine answers on:
+
+```
+python -m xrstream.server --https --port 8443
+```
+
+It prints the address to open in the headset. The certificate is self-signed, so the browser warns once:
+Advanced -> Proceed.
+
+**Over USB**, if the headset is in developer mode:
 
 ```
 adb reverse tcp:8010 tcp:8010
@@ -68,6 +79,17 @@ reports immersive-vr support, so on a LAN address such as `http://192.168.1.20:8
 browser's rule, not ours). Wireless instead: serve over HTTPS with `uvicorn --ssl-keyfile/--ssl-certfile` and accept
 the certificate on the headset.
 
+Two things will waste an afternoon if nobody warns you. **Guest and phone-hotspot networks usually isolate their
+clients**, so the headset has internet and still cannot reach the laptop; Windows' own Mobile Hotspot does not, and
+is the quickest way out. And **a Windows firewall Block rule for python.exe beats any Allow rule you add** -- one
+gets created every time someone dismisses the "allow network access?" prompt, and the symptom is a connection that
+times out on every port. Look for it before blaming anything else:
+
+```
+Get-NetFirewallRule -Direction Inbound -Action Block -Enabled True |
+  Where-Object { ($_ | Get-NetFirewallApplicationFilter).Program -match 'python' }
+```
+
 Inside:
 
 | control | does |
@@ -75,6 +97,7 @@ Inside:
 | right thumbstick | glide, in the direction you are looking |
 | left thumbstick left/right | snap turn, 30 degrees a step |
 | A | stand back where the room puts the viewer |
+| B / Y | next / previous lesson, without taking the headset off |
 
 Snap turning rather than smooth turning, no screen shake during explosions, and no autopilot: a lesson that drags
 the viewer around is unpleasant to wear, so entering VR hands control back to the person. The captions cannot be

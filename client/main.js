@@ -1126,11 +1126,22 @@
   // Thumbsticks: right glides, left snap-turns. Snap rather than smooth turning
   // because it is what most people can wear for a whole lesson.
   const _fwd = new THREE.Vector3(), _rgt = new THREE.Vector3();
-  let snapReady = true;
+  let snapReady = true, lessonReady = true;
+
+  // Changing the lesson from a headset: the page's own menu is not there to
+  // click, so B and Y walk through the lessons without taking the headset off.
+  function stepLesson(delta) {
+    const names = [...lessonSel.options].map(o => o.value).filter(Boolean);
+    if (!names.length) return;
+    const i = names.indexOf(lessonSel.value);
+    const at = i < 0 ? (delta > 0 ? -1 : 0) : i;
+    lessonSel.value = names[(at + delta + names.length) % names.length];
+    lessonSel.dispatchEvent(new Event("change"));
+  }
   function xrControls(dt) {
     const s = renderer.xr.getSession();
     if (!s) return;
-    let move = null, turn = 0, recentre = false;
+    let move = null, turn = 0, recentre = false, lesson = 0;
     for (const src of s.inputSources) {
       const gp = src.gamepad;
       if (!gp || !gp.axes) continue;
@@ -1141,6 +1152,9 @@
         move = ax;
       }
       if (gp.buttons && gp.buttons[4] && gp.buttons[4].pressed) recentre = true;
+      if (gp.buttons && gp.buttons[5] && gp.buttons[5].pressed) {
+        lesson = src.handedness === "left" ? -1 : 1;    // Y back, B forward
+      }
     }
     if (turn && snapReady) { turnRig(-turn * Math.PI / 6); snapReady = false; }
     if (!turn) snapReady = true;
@@ -1152,6 +1166,8 @@
       rig.position.addScaledVector(_fwd, -move[1] * speed);
       rig.position.addScaledVector(_rgt, move[0] * speed);
     }
+    if (lesson && lessonReady) { stepLesson(lesson); lessonReady = false; }
+    if (!lesson) lessonReady = true;
     if (recentre) roomHome ? home(roomHome[0], roomHome[1]) : home();
   }
 
@@ -1271,7 +1287,7 @@
 
   // for debugging and automated checks: the scene and what is on screen
   window.__uc7 = { scene, meta, shown, variants, current, clock: () => clock(),
-                   renderer, rig, camera, readHead, headPos, headDir };
+                   renderer, rig, camera, readHead, headPos, headDir, stepLesson };
 
   connect();
   renderer.setAnimationLoop(frame);   // three.js swaps in the headset's own clock

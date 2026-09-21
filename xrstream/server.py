@@ -270,9 +270,30 @@ def main():
     ap.add_argument("--port", type=int, default=8000)
     ap.add_argument("--scenario", default=DEFAULT_SCENARIO,
                     choices=list(scenarios.NAMES))
+    ap.add_argument("--https", action="store_true",
+                    help="serve over https with a self-signed certificate, so a "
+                         "headset on the network can start a WebXR session")
     args = ap.parse_args()
     globals()["DEFAULT_SCENARIO"] = args.scenario
-    uvicorn.run(app, host=args.host, port=args.port, log_level="info")
+
+    ssl = {}
+    if args.https:
+        from . import certs
+        cert, key = certs.ensure_cert()
+        ssl = {"ssl_certfile": str(cert), "ssl_keyfile": str(key)}
+        # a headset reaches this machine by its address on the network, not by
+        # localhost, so listening only on the loopback would hide the viewer
+        if args.host == "127.0.0.1":
+            args.host = "0.0.0.0"
+        print()
+        print("Open this in the headset, then press Enter VR:")
+        for ip in certs.lan_addresses():
+            print(f"    https://{ip}:{args.port}")
+        print("The certificate is self-signed, so the browser warns once: "
+              "Advanced -> Proceed.")
+        print()
+
+    uvicorn.run(app, host=args.host, port=args.port, log_level="info", **ssl)
 
 
 if __name__ == "__main__":
