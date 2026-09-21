@@ -50,6 +50,39 @@ the other way round: run a lesson at 3 Mbit/s until it looks broken, then press 
 .venv/Scripts/python -m pytest tests -q                          # 132 tests
 ```
 
+## Watching from a headset (WebXR)
+
+The viewer is also a WebXR page, so the same lesson can be watched from inside a Quest 3: stereo, real head
+tracking, and -- the point of doing it at all -- **the headset's own pose is what the server streams for**, so the
+streaming policies react to where the teacher actually looks.
+
+An immersive session needs a secure context. `https://` works; so does plain HTTP on `localhost`, which is the
+easy way with a headset on a cable:
+
+```
+adb reverse tcp:8010 tcp:8010
+```
+
+Then open `http://localhost:8010` in the headset and press **Enter VR** (the button only appears when the browser
+reports immersive-vr support, so on a LAN address such as `http://192.168.1.20:8010` it stays hidden -- that is the
+browser's rule, not ours). Wireless instead: serve over HTTPS with `uvicorn --ssl-keyfile/--ssl-certfile` and accept
+the certificate on the headset.
+
+Inside:
+
+| control | does |
+|---|---|
+| right thumbstick | glide, in the direction you are looking |
+| left thumbstick left/right | snap turn, 30 degrees a step |
+| A | stand back where the room puts the viewer |
+
+Snap turning rather than smooth turning, no screen shake during explosions, and no autopilot: a lesson that drags
+the viewer around is unpleasant to wear, so entering VR hands control back to the person. The captions cannot be
+read from a page you are no longer looking at, so in VR they are painted onto a panel below the line of sight,
+together with the quality score.
+
+The desktop viewer is unchanged -- same page, same keys.
+
 ## The idea: stream from the lesson plan
 
 Existing viewport-adaptive streaming guesses where you'll look from your recent head movement, which works a few

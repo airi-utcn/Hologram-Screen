@@ -40,6 +40,8 @@
   const host = document.getElementById("view");
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(2, window.devicePixelRatio));
+  renderer.xr.enabled = true;                  // the same viewer drives a headset
+  renderer.xr.setReferenceSpaceType("local-floor");   // y = 0 is the real floor
   host.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
@@ -51,8 +53,52 @@
   scene.add(new THREE.GridHelper(40, 40, 0x1c2230, 0x161b25));
 
   const camera = new THREE.PerspectiveCamera(60, 1, 0.05, 260);
+
+  // In VR the headset owns the camera's pose, so everything that would move the
+  // viewer -- walking, standing where a lesson asks, turning -- moves this rig
+  // underneath instead, and the head rides on top of it. On the desktop the rig
+  // stays at the origin, so the camera's own position is still the eye point.
+  const rig = new THREE.Group();
+  rig.add(camera);
+  scene.add(rig);
+  const inVR = () => renderer.xr.isPresenting;
+
+  const EYE_H = 1.6;               // a standing adult, for placing the rig
+  const UP = new THREE.Vector3(0, 1, 0);
+  const headPos = new THREE.Vector3(), headDir = new THREE.Vector3();
+  const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _s = new THREE.Vector3();
+
+  // Where the eye really is. In VR that is the headset, which three.js keeps on
+  // its own XR camera; on the desktop it is simply our camera.
+  function readHead() {
+    const c = inVR() ? renderer.xr.getCamera(camera) : camera;
+    _m.copy(c.matrixWorld).decompose(headPos, _q, _s);
+    headDir.set(0, 0, -1).applyQuaternion(_q);
+  }
+
+  // Turn the world around the head, not around the rig's origin, so that a
+  // snap turn does not swing the person through an arc.
+  function turnRig(angle) {
+    readHead();
+    rig.position.sub(headPos).applyAxisAngle(UP, angle).add(headPos);
+    rig.rotation.y += angle;
+  }
+
+  // Stand on the floor under a requested eye point: with a local-floor space
+  // the headset already supplies the person's own height.
+  function standAt(eye, look) {
+    rig.position.set(eye[0], Math.max(0, eye[1] - EYE_H), eye[2]);
+    if (look) {
+      readHead();
+      const want = Math.atan2(-(look[0] - eye[0]), -(look[2] - eye[2]));
+      turnRig(want - Math.atan2(-headDir.x, -headDir.z));
+    }
+  }
+
   let yaw = 0, pitch = -0.02;
+  let roomHome = null;             // where this room wants the viewer to stand
   function home(eye = [0, 1.65, 7], look = [0, 1.4, -5]) {
+    if (inVR()) { standAt(eye, look); return; }
     camera.position.set(eye[0], eye[1], eye[2]);
     const dx = look[0] - eye[0], dy = look[1] - eye[1], dz = look[2] - eye[2];
     yaw = Math.atan2(-dx, -dz);
@@ -61,6 +107,7 @@
   home();
 
   function resize() {
+    if (inVR()) return;            // the headset's framebuffer is not ours to size
     renderer.setSize(window.innerWidth, window.innerHeight);
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
@@ -823,7 +870,7 @@
       }
       else if (msg.type === "states") setStates(msg.states);
       else if (msg.type === "metrics") onMetrics(msg);
-      else if (msg.type === "pose" && autopilot) {
+      else if (msg.type === "pose" && autopilot && !inVR()) {
         camera.position.set(msg.pos[0], msg.pos[1], msg.pos[2]);
         const f = msg.forward;
         yaw = Math.atan2(-f[0], -f[2]);
@@ -868,6 +915,7 @@
       const sc = scenarioList.find(x => x.name === scenario);
       if (sc) {
         $("scenarioDesc").textContent = sc.blurb || "";
+        roomHome = [sc.home, sc.look];
         home(sc.home, sc.look);       // drop the viewer somewhere sensible
       }
     }
@@ -1031,48 +1079,200 @@
     g.stroke();
   }
 
+  // ---------------------------------------------------------------- WebXR
+  // The headset needs a secure context: https://, or http://localhost with the
+  // port forwarded over USB (adb reverse tcp:8010 tcp:8010). On a plain LAN
+  // address the browser refuses immersive sessions, so the button stays hidden.
+  const vrBtn = $("vr");
+  let xrSession = null;
+
+  if (navigator.xr && navigator.xr.isSessionSupported) {
+    navigator.xr.isSessionSupported("immersive-vr")
+      .then(ok => { vrBtn.hidden = !ok; })
+      .catch(() => {});
+  }
+
+  vrBtn.addEventListener("click", async () => {
+    if (xrSession) { xrSession.end(); return; }
+    let session;
+    try {
+      session = await navigator.xr.requestSession("immersive-vr",
+        { optionalFeatures: ["local-floor", "bounded-floor", "hand-tracking"] });
+    } catch (err) {
+      vrBtn.textContent = "🥽 VR unavailable";
+      return;
+    }
+    xrSession = session;
+    takeControl();                  // being carried around by the lesson is sickening
+    const eye = camera.position.toArray();
+    await renderer.xr.setSession(session);
+    if (renderer.xr.setFoveation) renderer.xr.setFoveation(0.6);   // spare the GPU
+    standAt(eye, null);
+    hud.visible = true;
+    vrBtn.textContent = "🥽 Leave VR";
+    session.addEventListener("end", () => {
+      xrSession = null;
+      hud.visible = false;
+      vrBtn.textContent = "🥽 Enter VR";
+      camera.position.copy(headPos);         // step out where you were standing
+      yaw = Math.atan2(-headDir.x, -headDir.z);
+      pitch = Math.asin(Math.max(-1, Math.min(1, headDir.y)));
+      rig.position.set(0, 0, 0);
+      rig.rotation.set(0, 0, 0);
+      resize();
+    });
+  });
+
+  // Thumbsticks: right glides, left snap-turns. Snap rather than smooth turning
+  // because it is what most people can wear for a whole lesson.
+  const _fwd = new THREE.Vector3(), _rgt = new THREE.Vector3();
+  let snapReady = true;
+  function xrControls(dt) {
+    const s = renderer.xr.getSession();
+    if (!s) return;
+    let move = null, turn = 0, recentre = false;
+    for (const src of s.inputSources) {
+      const gp = src.gamepad;
+      if (!gp || !gp.axes) continue;
+      const ax = gp.axes.length >= 4 ? [gp.axes[2], gp.axes[3]] : [gp.axes[0], gp.axes[1]];
+      if (src.handedness === "left") {
+        if (Math.abs(ax[0]) > 0.7) turn = Math.sign(ax[0]);
+      } else if (Math.hypot(ax[0], ax[1]) > 0.15) {
+        move = ax;
+      }
+      if (gp.buttons && gp.buttons[4] && gp.buttons[4].pressed) recentre = true;
+    }
+    if (turn && snapReady) { turnRig(-turn * Math.PI / 6); snapReady = false; }
+    if (!turn) snapReady = true;
+    if (move) {
+      readHead();
+      _fwd.set(headDir.x, 0, headDir.z).normalize();
+      _rgt.crossVectors(_fwd, UP);
+      const speed = 2.0 * dt;
+      rig.position.addScaledVector(_fwd, -move[1] * speed);
+      rig.position.addScaledVector(_rgt, move[0] * speed);
+    }
+    if (recentre) roomHome ? home(roomHome[0], roomHome[1]) : home();
+  }
+
+  // The shape of the view, for the server's culling and detail budget. An XR
+  // eye's frustum is off-axis, so this reads back the one the headset gave us
+  // rather than assuming the desktop camera's numbers.
+  function viewShape() {
+    if (!inVR()) return [camera.fov, camera.aspect, window.innerHeight];
+    const session = renderer.xr.getSession();
+    if (!session) return [camera.fov, camera.aspect, window.innerHeight];
+    const xrCam = renderer.xr.getCamera(camera);
+    const eye = (xrCam.cameras && xrCam.cameras[0]) || xrCam;
+    const e = eye.projectionMatrix.elements;
+    const layer = session.renderState.baseLayer;
+    return [2 * Math.atan(1 / e[5]) * 180 / Math.PI, e[5] / e[0],
+            (layer && layer.framebufferHeight) || window.innerHeight];
+  }
+
+  // The captions live in the page, which nobody can read inside a headset, so
+  // in VR they are painted onto a panel that hangs below the line of sight.
+  const hud = (() => {
+    const cv = document.createElement("canvas");
+    cv.width = 1024; cv.height = 256;
+    const tex = new THREE.CanvasTexture(cv);
+    const mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.92, 0.23),
+      new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthTest: false }));
+    mesh.position.set(0, -0.33, -1.1);
+    mesh.renderOrder = 999;
+    mesh.visible = false;
+    mesh.userData = { cv, tex, key: "" };
+    camera.add(mesh);
+    return mesh;
+  })();
+
+  function hudText(g, text, x, y, maxW, lineH, maxLines) {
+    const words = String(text).split(/\s+/);
+    let line = "", n = 0;
+    for (const w of words) {
+      const test = line ? line + " " + w : w;
+      if (g.measureText(test).width > maxW && line) {
+        g.fillText(line, x, y + n * lineH);
+        if (++n === maxLines) return;
+        line = w;
+      } else { line = test; }
+    }
+    g.fillText(line, x, y + n * lineH);
+  }
+
+  function drawHud() {
+    const key = `${$("capStep").textContent}|${$("capText").textContent}|${$("qoe").textContent}`;
+    if (key === hud.userData.key) return;
+    hud.userData.key = key;
+    const { cv, tex } = hud.userData, g = cv.getContext("2d");
+    g.clearRect(0, 0, cv.width, cv.height);
+    g.fillStyle = "rgba(9,13,19,0.86)";
+    g.fillRect(0, 0, cv.width, cv.height);
+    g.fillStyle = "#4fb3ff";
+    g.font = "600 28px system-ui, sans-serif";
+    g.fillText($("capStep").textContent.toUpperCase(), 34, 56);
+    g.textAlign = "right";
+    g.fillStyle = "#9fb0c6";
+    g.fillText(`quality ${$("qoe").textContent}`, cv.width - 34, 56);
+    g.textAlign = "left";
+    g.fillStyle = "#eef2f8";
+    g.font = "34px system-ui, sans-serif";
+    hudText(g, $("capText").textContent, 34, 116, cv.width - 68, 46, 3);
+    tex.needsUpdate = true;
+  }
+
   // ---------------------------------------------------------------- loop
   let last = performance.now(), lastSent = 0;
   function frame(now) {
     const dt = Math.min(0.1, (now - last) / 1000);
     last = now;
 
-    const f = forward();
-    const flat = new THREE.Vector3(f.x, 0, f.z).normalize();
-    const right = new THREE.Vector3().crossVectors(flat, new THREE.Vector3(0, 1, 0));
-    const speed = autopilot ? 0 : (keys.has("shift") ? 6 : 2.5) * dt;
-    if (keys.has("w")) camera.position.addScaledVector(flat, speed);
-    if (keys.has("s")) camera.position.addScaledVector(flat, -speed);
-    if (keys.has("d")) camera.position.addScaledVector(right, speed);
-    if (keys.has("a")) camera.position.addScaledVector(right, -speed);
-    if (keys.has("e")) camera.position.y += speed;
-    if (keys.has("q")) camera.position.y -= speed;
-    camera.lookAt(camera.position.clone().add(f));
+    if (inVR()) {
+      xrControls(dt);
+    } else {
+      const f = forward();
+      const flat = new THREE.Vector3(f.x, 0, f.z).normalize();
+      const right = new THREE.Vector3().crossVectors(flat, new THREE.Vector3(0, 1, 0));
+      const speed = autopilot ? 0 : (keys.has("shift") ? 6 : 2.5) * dt;
+      if (keys.has("w")) camera.position.addScaledVector(flat, speed);
+      if (keys.has("s")) camera.position.addScaledVector(flat, -speed);
+      if (keys.has("d")) camera.position.addScaledVector(right, speed);
+      if (keys.has("a")) camera.position.addScaledVector(right, -speed);
+      if (keys.has("e")) camera.position.y += speed;
+      if (keys.has("q")) camera.position.y -= speed;
+      camera.lookAt(camera.position.clone().add(f));
+    }
 
+    // What the server streams for follows the real eye: in VR that is the
+    // headset's own pose, which is the whole point of wearing one here.
+    readHead();
     if (ws && ws.readyState === 1 && now - lastSent > 50) {
       lastSent = now;
+      const [fovY, aspect, screenH] = viewShape();
       ws.send(JSON.stringify({
-        type: "camera", pos: camera.position.toArray(), forward: f.toArray(),
-        fov_y_deg: camera.fov, aspect: camera.aspect, screen_h: window.innerHeight }));
+        type: "camera", pos: headPos.toArray(), forward: headDir.toArray(),
+        fov_y_deg: fovY, aspect, screen_h: screenH }));
     }
     updateSpotlight(now / 1000);
     pen.visible = false;
     flash = 0; shake = 0;
     for (const v of shown.values()) animate(v);
     $("flash").style.opacity = (0.85 * flash).toFixed(3);
-    if (shake > 0) {
+    if (shake > 0 && !inVR()) {      // shaking someone's head is how you make them ill
       const k = 0.035 * shake;
       camera.position.x += (Math.random() - 0.5) * k; camera.position.y += (Math.random() - 0.5) * k;
     }
     updateListener();
     reapLoops();
+    if (inVR()) drawHud();
     renderer.render(scene, camera);
-    requestAnimationFrame(frame);
   }
 
   // for debugging and automated checks: the scene and what is on screen
-  window.__uc7 = { scene, meta, shown, variants, current, clock: () => clock() };
+  window.__uc7 = { scene, meta, shown, variants, current, clock: () => clock(),
+                   renderer, rig, camera, readHead, headPos, headDir };
 
   connect();
-  requestAnimationFrame(frame);
+  renderer.setAnimationLoop(frame);   // three.js swaps in the headset's own clock
 })();
