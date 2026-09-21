@@ -104,6 +104,23 @@ def index():
 
 app.mount("/client", StaticFiles(directory=CLIENT_DIR), name="client")
 
+LOGO_TYPES = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"}
+
+
+@app.get("/logos")
+def logos() -> list[str]:
+    """Whatever images sit in client/logos, in name order.
+
+    Read from the folder rather than written into the page, so that a logo is
+    added by dropping the file in -- and so that a lab can put its own there
+    without touching the viewer. Name them 1-..., 2-... to fix their order.
+    """
+    folder = CLIENT_DIR / "logos"
+    if not folder.is_dir():
+        return []
+    return [f"/client/logos/{f.name}" for f in sorted(folder.iterdir())
+            if f.suffix.lower() in LOGO_TYPES]
+
 
 @app.websocket("/ws")
 async def stream(ws: WebSocket):

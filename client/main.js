@@ -916,6 +916,7 @@
       if (sc) {
         $("scenarioDesc").textContent = sc.blurb || "";
         roomHome = [sc.home, sc.look];
+        setTimeout(placeBanner, 0);        // once this room's objects are known
         home(sc.home, sc.look);       // drop the viewer somewhere sensible
       }
     }
@@ -1619,8 +1620,99 @@
     if (k === "m") togglePanel(menuPanel);
   });
 
+  // ------------------------------------------------------- logos
+  // Whatever sits in client/logos, shown twice: as a strip on the page, and on
+  // a board hung in the room, because in a headset the page is not there. The
+  // same <img> elements feed both, which is what makes an animated GIF animate
+  // in VR too -- drawing an img onto a canvas takes the frame showing now.
+  const logoImgs = [];
+  let logosAnimate = false, banner = null;
+
+  function buildBanner() {
+    const cv = document.createElement("canvas");
+    cv.width = 1400; cv.height = 300;
+    const tex = new THREE.CanvasTexture(cv);
+    banner = new THREE.Mesh(
+      new THREE.PlaneGeometry(2.6, 2.6 * 300 / 1400),
+      new THREE.MeshBasicMaterial({ map: tex, transparent: true }));
+    banner.userData = { cv, tex };
+    banner.visible = false;
+    scene.add(banner);
+    placeBanner();
+  }
+
+  // Above the board, turned towards where the room puts a viewer. Rooms differ,
+  // so fall back to the point the room asks the viewer to look at.
+  function placeBanner() {
+    if (!banner) return;
+    let x = 0, z = -5.6;
+    let board = null;
+    for (const entry of meta) {
+      const m = entry[1];
+      if (/board|screen/i.test(m.name)) { board = m; break; }
+    }
+    const eye = roomHome ? roomHome[0] : [0, 1.65, 7];
+    if (board) {
+      x = board.centre[0]; z = board.centre[2];
+    } else if (roomHome) {
+      // no board in this room: carry on past what the room asks you to watch,
+      // so the logos end up on the far wall rather than floating over the class
+      const look = roomHome[1];
+      const dx = look[0] - eye[0], dz = look[2] - eye[2];
+      const len = Math.hypot(dx, dz) || 1;
+      x = look[0] + (dx / len) * 3.5;
+      z = look[2] + (dz / len) * 3.5;
+    }
+    banner.position.set(x, 3.25, z + (board ? 0.1 : 0));
+    banner.lookAt(eye[0], 3.25, eye[2]);
+    banner.visible = logoImgs.length > 0;
+  }
+
+  function drawBanner() {
+    if (!banner) return;
+    const cv = banner.userData.cv, g = cv.getContext("2d");
+    const ready = logoImgs.filter(im => im.complete && im.naturalWidth);
+    g.clearRect(0, 0, cv.width, cv.height);
+    if (!ready.length) return;
+
+    roundBox(g, 0, 0, cv.width, cv.height, 34, "rgba(255,255,255,0.94)", null);
+    const boxH = 180, gap = 90, pad = 70;
+    const widths = ready.map(im => boxH * im.naturalWidth / im.naturalHeight);
+    let total = widths.reduce((a, b) => a + b, 0) + gap * (ready.length - 1);
+    let scale = Math.min(1, (cv.width - 2 * pad) / total);
+    total *= scale;
+    let x = (cv.width - total) / 2;
+    const y = (cv.height - boxH * scale) / 2;
+    ready.forEach((im, i) => {
+      const w = widths[i] * scale;
+      g.drawImage(im, x, y, w, boxH * scale);
+      x += w + gap * scale;
+    });
+    banner.userData.tex.needsUpdate = true;
+  }
+
+  fetch("/logos")
+    .then(r => r.json())
+    .then(urls => {
+      if (!urls.length) return;
+      logosAnimate = urls.some(u => /\.gif$/i.test(u));
+      const strip = $("logos");
+      for (const url of urls) {
+        const img = new Image();
+        img.src = url;
+        img.alt = "";
+        // a GIF only advances while it is in the page, so the strip is also
+        // what keeps the copy in VR moving
+        strip.appendChild(img);
+        logoImgs.push(img);
+        img.addEventListener("load", () => { placeBanner(); drawBanner(); });
+      }
+      buildBanner();
+    })
+    .catch(() => {});
+
   // ---------------------------------------------------------------- loop
-  let last = performance.now(), lastSent = 0;
+  let last = performance.now(), lastSent = 0, lastLogo = 0;
   function frame(now) {
     const dt = Math.min(0.1, (now - last) / 1000);
     last = now;
@@ -1665,6 +1757,7 @@
     updateListener();
     reapLoops();
     if (inVR()) { drawHud(); if (anyPanelOpen()) aimInVR(); }
+    if (logosAnimate && now - lastLogo > 60) { lastLogo = now; drawBanner(); }
     for (const mesh of panels) if (mesh.visible) keepInView(mesh, dt);
     if (infoPanel.visible) drawInfo();
     if (menuPanel.visible) drawMenu();

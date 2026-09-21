@@ -50,6 +50,18 @@ the other way round: run a lesson at 3 Mbit/s until it looks broken, then press 
 .venv/Scripts/python -m pytest tests -q                          # 132 tests
 ```
 
+## Logos
+
+Drop image files into `client/logos` and they appear in two places: a strip across the top of the page, and a board
+hung above the whiteboard inside the room, which is the one a headset can see. Name them `1-institute.png`,
+`2-project.gif` to fix the order.
+
+PNG, JPG, WEBP, SVG and GIF all work, and **an animated GIF keeps animating in VR too** -- the page and the room
+share the same image elements, and drawing one onto a canvas takes whatever frame is showing. Nothing needs
+editing to add or swap a logo: the viewer asks the server what is in the folder.
+
+In a room with no board, such as the sports hall, the logos go on the far wall behind the lesson instead.
+
 ## Watching from a headset (WebXR)
 
 The viewer is also a WebXR page, so the same lesson can be watched from inside a Quest 3: stereo, real head
