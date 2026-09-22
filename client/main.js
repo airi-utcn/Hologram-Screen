@@ -64,6 +64,10 @@
   const inVR = () => renderer.xr.isPresenting;
 
   const EYE_H = 1.6;               // a standing adult, for placing the rig
+  // The floor the rig stands on, and how far above it the person is lifted.
+  // A headset puts your eyes at your own height, which in these rooms can feel
+  // low; the left thumbstick moves this up and down without leaving VR.
+  let rigFloor = 0, vrLift = 0.25;
   const UP = new THREE.Vector3(0, 1, 0);
   const headPos = new THREE.Vector3(), headDir = new THREE.Vector3();
   const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _s = new THREE.Vector3();
@@ -87,7 +91,8 @@
   // Stand on the floor under a requested eye point: with a local-floor space
   // the headset already supplies the person's own height.
   function standAt(eye, look) {
-    rig.position.set(eye[0], Math.max(0, eye[1] - EYE_H), eye[2]);
+    rigFloor = Math.max(0, eye[1] - EYE_H);
+    rig.position.set(eye[0], rigFloor + vrLift, eye[2]);
     if (look) {
       readHead();
       const want = Math.atan2(-(look[0] - eye[0]), -(look[2] - eye[2]));
@@ -1155,6 +1160,12 @@
       const ax = gp.axes.length >= 4 ? [gp.axes[2], gp.axes[3]] : [gp.axes[0], gp.axes[1]];
       if (src.handedness === "left") {
         if (Math.abs(ax[0]) > 0.7) turn = Math.sign(ax[0]);
+        // up and down on the same stick: how tall you stand in the room
+        if (Math.abs(ax[1]) > 0.25) {
+          vrLift = Math.max(-0.8, Math.min(2.0, vrLift - ax[1] * 0.6 * dt));
+          rig.position.y = rigFloor + vrLift;
+          infoPanel.userData.key = "";
+        }
       } else if (Math.hypot(ax[0], ax[1]) > 0.15) {
         move = ax;
       }
@@ -1346,6 +1357,7 @@
 
     const rows = [
       ["you are", role === "free" ? "free to walk" : role],
+      ...(inVR() ? [["how tall you stand", (EYE_H + vrLift).toFixed(2) + " m"]] : []),
       ["room", scenarioSel.options[scenarioSel.selectedIndex].text],
       ["what gets sent first", policySel.options[policySel.selectedIndex].text],
       ["internet speed", bw.value + " Mbit/s"],
@@ -1545,7 +1557,8 @@
       readHead();
       // move the floor under the head, allowing for however far the person has
       // walked out in their own room
-      _want.set(x - (headPos.x - rig.position.x), eyeH - EYE_H,
+      rigFloor = eyeH - EYE_H;
+      _want.set(x - (headPos.x - rig.position.x), rigFloor + vrLift,
                 z - (headPos.z - rig.position.z));
       rig.position.lerp(_want, k);
     } else {

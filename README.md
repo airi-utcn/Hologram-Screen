@@ -118,6 +118,7 @@ Inside:
 |---|---|
 | right thumbstick | glide, in the direction you are looking |
 | left thumbstick left/right | snap turn, 30 degrees a step |
+| left thumbstick up/down | how tall you stand: a headset puts your eyes at your own height, which in these rooms can feel low |
 | trigger | press whatever the ray is pointing at |
 | A | stand back where the room puts the viewer |
 | B | next lesson |
