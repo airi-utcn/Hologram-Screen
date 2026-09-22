@@ -50,19 +50,36 @@ COMMON_CAP = 0.8
 SHARE_MIN = 2
 
 
+#: How a student spends their attention. A class does not look where a plan
+#: says in unison, and a scheduler tested against one that does is measuring
+#: itself.
+KINDS = ("attentive",    # watches what the lesson is about
+         "late",         # gets there a second and a half after everyone else
+         "neighbour",    # watches another student instead
+         "drift")        # eyes wandering around the room
+
+
 @dataclass
 class Seat:
-    """Where one student sits, and what they are there to watch."""
+    """Where a student sits, what they are there to watch, and whether they do."""
     name: str
     eye: np.ndarray
     look: np.ndarray
+    kind: str = "attentive"
+    phase: float = 0.0          # so the wandering ones do not wander in step
+    neighbour: np.ndarray | None = None
 
 
-def seats_for(scene, n: int) -> list[Seat]:
+def seats_for(scene, n: int, attention: float = 1.0, seed: int = 7) -> list[Seat]:
     """`n` places in this room, starting from where its own people stand.
 
     The students in the scene are the front rows; a bigger class is seated in
     rows behind them, which is also where a real hub would put the overflow.
+
+    `attention` is the share of the class actually following the lesson. The
+    rest arrive late, watch a neighbour, or let their eyes wander, which is the
+    honest test of a scheduler that reads the plan: what a plan predicts and
+    what a room of teenagers does are different things.
     """
     people = [o for o in scene if o.dynamic and o.semantic in ("student", "athlete")]
     people.sort(key=lambda o: (float(o.base_centre[2]), float(o.base_centre[0])))
@@ -84,6 +101,15 @@ def seats_for(scene, n: int) -> list[Seat]:
             eye = np.array([-4.0 + 2.0 * col, 0.0, back + 1.8 + 1.8 * row])
         eye = np.array([eye[0], 1.55, eye[2]])
         seats.append(Seat(f"student_{i:02d}", eye, target.copy()))
+
+    rng = np.random.default_rng(seed)
+    following = int(round(max(0.0, min(1.0, attention)) * n))
+    for i, seat in enumerate(seats):
+        seat.phase = float(rng.uniform(0, 2 * np.pi))
+        if i >= following:
+            seat.kind = KINDS[1 + (i - following) % 3]
+        if seat.kind == "neighbour" and len(seats) > 1:
+            seat.neighbour = seats[(i + 1 + int(rng.integers(0, 3))) % len(seats)].eye
     return seats
 
 
@@ -106,18 +132,36 @@ class Watcher:
         self.bytes_received = 0
 
     # -- what this student is looking at ---------------------------------
-    def _camera(self, ctx) -> Camera:
-        """Seated, watching whatever the lesson is about."""
-        look = self.seat.look
-        if ctx is not None and ctx.focus:
-            scene = self.session.scene
-            at = [scene.by_id(o).centre for o in ctx.focus]
-            if at:
-                look = np.mean(at, axis=0)
-        forward = np.asarray(look, dtype=np.float64) - self.seat.eye
-        return Camera(pos=self.seat.eye, forward=forward, screen_h=1080)
+    def _focus(self, ctx):
+        """Where the lesson says to look, as a point in the room."""
+        if ctx is None or not ctx.focus:
+            return None
+        scene = self.session.scene
+        at = [scene.by_id(o).centre for o in ctx.focus]
+        return np.mean(at, axis=0) if at else None
 
-    def begin(self, t: float, ctx, changes: dict, rate: float) -> None:
+    def _camera(self, ctx, late=None, t: float = 0.0) -> Camera:
+        """Where this student is actually looking, which is not always the lesson."""
+        seat = self.seat
+        look = np.asarray(seat.look, dtype=np.float64)
+        at = self._focus(ctx)
+        if seat.kind == "attentive":
+            look = at if at is not None else look
+        elif seat.kind == "late":
+            behind = self._focus(late)          # still on what it was about
+            look = behind if behind is not None else look
+        elif seat.kind == "neighbour" and seat.neighbour is not None:
+            look = np.asarray(seat.neighbour, dtype=np.float64)
+        elif seat.kind == "drift":
+            base = at if at is not None else look
+            a = 0.9 * np.sin(0.35 * t + seat.phase)     # a slow sweep either side
+            d = base - seat.eye
+            ca, sa = np.cos(a), np.sin(a)
+            look = seat.eye + np.array([ca * d[0] + sa * d[2], d[1],
+                                        -sa * d[0] + ca * d[2]])
+        return Camera(pos=seat.eye, forward=look - seat.eye, screen_h=1080)
+
+    def begin(self, t: float, ctx, changes: dict, rate: float, late=None) -> None:
         st = self.session.state
         st.t = t
         st.pose = int(t * st.volumetric_hz)
@@ -134,7 +178,7 @@ class Watcher:
             else:
                 st.static_level[oid] = held
                 self.session.state_lags.append(0.0)
-        self.cam = self._camera(ctx)
+        self.cam = self._camera(ctx, late, t)
         self.queue = list(self.session.policy.rank(self.session.scene, self.cam, st))
 
     # -- receiving --------------------------------------------------------
@@ -168,6 +212,7 @@ class CellResult:
     students: int
     mbps: float
     seconds: float
+    attention: float
     mean_qoe: float
     worst_qoe: float           # the average, over time, of the worst student
     floor_qoe: float           # the worst any student ever had
@@ -180,6 +225,7 @@ class CellResult:
 
     def row(self) -> dict:
         return {"mode": self.mode, "students": self.students, "mbps": self.mbps,
+                "attention": self.attention,
                 "mean_qoe": round(self.mean_qoe, 4),
                 "worst_qoe": round(self.worst_qoe, 4),
                 "floor_qoe": round(self.floor_qoe, 4),
@@ -194,7 +240,7 @@ class Cell:
     def __init__(self, scenario: str = "classroom", lesson: str | None = None,
                  students: int = 8, mode: str = "hub", mbps: float = 50.0,
                  policy: str = "lesson_aware", tick_hz: float = 20.0,
-                 quantise=True, deflate=True):
+                 attention: float = 1.0, quantise=True, deflate=True):
         if mode not in MODES:
             raise KeyError(f"unknown cell scheduler {mode!r}; have {list(MODES)}")
         self.mode = mode
@@ -207,7 +253,8 @@ class Cell:
             self.lesson.bind(self.scene)
         self.scene.reset_dynamics()
 
-        seats = seats_for(self.scene, students)
+        self.attention = float(attention)
+        seats = seats_for(self.scene, students, attention)
         self.watchers = [Watcher(self.scene, s, policy, quantise, deflate)
                          for s in seats]
         self.shared: Transfer | None = None
@@ -222,6 +269,9 @@ class Cell:
         dt, scene = self.dt, self.scene
         self.t += dt
         ctx = self.lesson.context(self.t) if self.lesson is not None else None
+        # what the lesson was about a moment ago, for whoever is behind it
+        late = (self.lesson.context(max(0.0, self.t - 1.5))
+                if self.lesson is not None else None)
         if self.lesson is not None:
             changes = self.lesson.apply(self.t)      # once for the room, not once each
         else:
@@ -229,14 +279,16 @@ class Cell:
             changes = {}
         rate = self.mbps * 1e6 / 8.0 / max(1, len(self.watchers))
         for w in self.watchers:
-            w.begin(self.t, ctx, changes, rate)
+            w.begin(self.t, ctx, changes, rate, late)
 
         budget = self.credit + self.mbps * 1e6 / 8.0 * dt
         spent_before = self.sent
 
-        if self.mode in ("broadcast", "hub"):
-            budget -= self._pour_common(budget * COMMON_CAP)
-        if self.mode != "broadcast":
+        if self.mode == "hub":
+            budget -= self._pour_by_value(budget)
+        elif self.mode == "broadcast":
+            budget -= self._pour_common(budget)
+        else:
             budget -= self._pour_personal(budget)
 
         # unspent capacity is worth a fraction of a second, no more: a cell
@@ -313,6 +365,133 @@ class Cell:
                 self.delivered += tr.total
         self.shared, self.shared_for = None, []
 
+    # -- the hub: whatever is worth the most per byte ----------------------
+    # A fixed share for the broadcast is a guess, and a wrong one whenever the
+    # class is more united, or less, than the guess assumed. Every candidate is
+    # priced instead: what it is worth to the room, over what it costs to put on
+    # the air. Geometry twenty students are waiting for is worth twenty times
+    # the same geometry for one, and costs the same to send once -- so a class
+    # watching together is served like television, a scattered one like twenty
+    # separate streams, and nobody has to choose which.
+    def _pour_by_value(self, budget: float) -> float:
+        spent = 0.0
+        # whatever was half sent when the last tick ran out goes first
+        if self.shared is not None:
+            step = self._pour(self.shared, budget)
+            spent += step
+            budget -= step
+            if not self.shared.done:
+                return spent
+            self._finish_shared()
+        for w in self.watchers:
+            if w.inflight is None or budget <= 0:
+                continue
+            step = self._pour(w.inflight, budget)
+            spent += step
+            budget -= step
+            if not w.inflight.done:
+                return spent
+            w.take(w.inflight)
+            self.delivered += w.inflight.total
+            w.inflight = None
+
+        common = self._common_queue()
+        worst = min((w.qoe for w in self.watchers), default=1.0)
+        while budget > 0:
+            pick = self._best_candidate(common, worst)
+            if pick is None:
+                break
+            tr, takers, who = pick
+            step = self._pour(tr, budget)
+            spent += step
+            budget -= step
+            if not tr.done:                   # carries on into the next tick
+                if takers:
+                    self.shared, self.shared_for = tr, takers
+                else:
+                    who.inflight = tr
+                break
+            if takers:
+                self.shared, self.shared_for = tr, takers
+                self._finish_shared()
+            else:
+                who.take(tr)
+                self.delivered += tr.total
+        return spent
+
+    def _best_candidate(self, common: list, worst: float):
+        """The next thing to send: the most value for its bytes.
+
+        A student who is worse off than the rest of the room counts for more,
+        which is what stops a cell from spending everything on the students who
+        are already comfortable.
+        """
+        best, best_value = None, 0.0
+
+        for key, slot in common:
+            oid, pose, state = key
+            level = slot["level"]
+            takers = [w for w in slot["who"]
+                      if w.wants(oid, level, pose if pose >= 0 else 0, state)]
+            if len(takers) < SHARE_MIN:
+                continue
+            size = self._size(oid, level, pose, state)
+            if size <= 0:
+                continue
+            value = slot["priority"] * self._need_weight(takers, worst) / size
+            if value > best_value:
+                best_value, best = value, ("shared", key, slot, takers)
+
+        for w in self.watchers:
+            req = self._head(w)
+            if req is None:
+                continue
+            oid, level, pose = req[0], req[1], req[2]
+            obj = self.scene.by_id(oid)
+            state = req[4] if len(req) > 4 and not obj.dynamic else obj.state
+            size = self._size(oid, level, pose if obj.dynamic else -1, state)
+            if size <= 0:
+                continue
+            priority = float(req[3]) if len(req) > 3 else 1.0
+            value = priority * self._need_weight([w], worst) / size
+            if value > best_value:
+                best_value, best = value, ("personal", w, None, None)
+
+        if best is None:
+            return None
+        if best[0] == "personal":
+            w = best[1]
+            tr = w.next_transfer()
+            return (tr, None, w) if tr is not None else None
+        _, key, slot, takers = best
+        oid, pose, state = key
+        tr = self._build(takers[0], oid, slot["level"], pose, state)
+        return (tr, takers, None) if tr is not None else None
+
+    @staticmethod
+    def _need_weight(takers: list, worst: float) -> float:
+        """What the room gains: a point per student, more for the worst served."""
+        return sum(1.0 + max(0.0, 0.6 - (w.qoe - worst)) for w in takers)
+
+    def _head(self, w: "Watcher"):
+        """What this student is waiting for next, past anything already arrived."""
+        while w.queue:
+            req = w.queue[0]
+            oid, level, pose = req[0], req[1], req[2]
+            obj = self.scene.by_id(oid)
+            state = req[4] if len(req) > 4 and not obj.dynamic else obj.state
+            if w.wants(oid, level, pose, state):
+                return req
+            w.queue.pop(0)
+        return None
+
+    def _size(self, oid: int, level: int, pose: int, state: str) -> int:
+        """What this piece would cost on the air, before deciding to send it."""
+        obj = self.scene.by_id(oid)
+        st = self.watchers[0].session.state
+        return int(obj.nbytes(level, st.quantise, st.deflate,
+                              pose if obj.dynamic and pose >= 0 else 0, state))
+
     # -- what differs between students ------------------------------------
     def _pour_personal(self, budget: float) -> float:
         if budget <= 0 or not self.watchers:
@@ -388,7 +567,8 @@ class Cell:
         worst = float(np.mean(worsts)) if worsts else 1.0
         return CellResult(
             mode=self.mode, students=len(self.watchers), mbps=self.mbps,
-            seconds=seconds, mean_qoe=mean, worst_qoe=worst,
+            seconds=seconds, attention=self.attention,
+            mean_qoe=mean, worst_qoe=worst,
             floor_qoe=float(min(worsts)) if worsts else 1.0,
             spread=mean - worst,
             cell_mbytes=self.sent / 1e6,
@@ -400,7 +580,8 @@ class Cell:
 def run(mode: str = "hub", students: int = 8, mbps: float = 50.0,
         lesson: str | None = "anatomy", scenario: str = "classroom",
         seconds: float = 20.0, policy: str = "lesson_aware",
-        tick_hz: float = 20.0) -> CellResult:
+        tick_hz: float = 20.0, attention: float = 1.0) -> CellResult:
     """One class, one cell, one scheduler."""
     return Cell(scenario=scenario, lesson=lesson, students=students, mode=mode,
-                mbps=mbps, policy=policy, tick_hz=tick_hz).run(seconds)
+                mbps=mbps, policy=policy, tick_hz=tick_hz,
+                attention=attention).run(seconds)

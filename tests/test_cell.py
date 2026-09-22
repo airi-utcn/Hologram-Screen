@@ -78,3 +78,37 @@ def test_many_rooms_in_one_process_do_not_collide():
         for o in scene:
             if o.dynamic:
                 o.level(1, 0)          # a capture at a coarser level
+
+
+def test_a_united_class_is_served_like_television():
+    """With everyone watching the same thing, nearly every byte is shared."""
+    r = cell.run(mode="hub", students=12, mbps=15, lesson="titration",
+                 seconds=5, attention=1.0)
+    assert r.sharing_gain > 4.0
+
+
+def test_a_scattered_class_shares_less_and_the_hub_notices():
+    """When they look elsewhere, less is common -- and more must be personal."""
+    together = cell.run(mode="hub", students=12, mbps=15, lesson="titration",
+                        seconds=5, attention=1.0)
+    apart = cell.run(mode="hub", students=12, mbps=15, lesson="titration",
+                     seconds=5, attention=0.25)
+    assert apart.sharing_gain < together.sharing_gain
+
+
+def test_pricing_beats_broadcasting_when_the_class_scatters():
+    """The point of pricing per byte: television cannot answer one student."""
+    tv = cell.run(mode="broadcast", students=12, mbps=15, lesson="titration",
+                  seconds=6, attention=0.5)
+    ours = cell.run(mode="hub", students=12, mbps=15, lesson="titration",
+                    seconds=6, attention=0.5)
+    assert ours.worst_qoe > tv.worst_qoe
+    assert ours.mean_qoe > tv.mean_qoe
+
+
+def test_attention_changes_who_looks_where():
+    from xrstream import scenarios
+    scene = scenarios.build("classroom")
+    kinds = {s.kind for s in cell.seats_for(scene, 12, attention=0.5)}
+    assert kinds == set(cell.KINDS)
+    assert {s.kind for s in cell.seats_for(scene, 12, attention=1.0)} == {"attentive"}
