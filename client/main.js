@@ -1684,7 +1684,7 @@
     img.style.margin = (-t) + "px " + (-r) + "px " + (-b) + "px " + (-l) + "px";
   }
 
-  const LOGO_H = 0.7;              // how tall a logo hangs on the wall, in metres
+  const LOGO_H = 0.7;              // beside a board, where the board sets the scale
   const logoPanels = [];
 
   function buildBanner() {
@@ -1706,15 +1706,15 @@
 
   // Each logo keeps its own shape: a wide one stays wide, and both hang the
   // same height, which is what makes them read as a pair.
-  function sizePanel(mesh) {
+  function sizePanel(mesh, tall) {
     const ink = logoInk.get(mesh.userData.img);
-    if (!ink || mesh.userData.sized) return;
+    if (!ink || mesh.userData.sizedFor === tall) return;
     const aspect = ink.w / ink.h;
     mesh.userData.cv.width = Math.max(16, Math.round(256 * aspect));
     mesh.userData.cv.height = 256;
     mesh.geometry.dispose();
-    mesh.geometry = new THREE.PlaneGeometry(LOGO_H * aspect, LOGO_H);
-    mesh.userData.sized = true;
+    mesh.geometry = new THREE.PlaneGeometry(tall * aspect, tall);
+    mesh.userData.sizedFor = tall;
   }
 
   // One each side of the board, on the wall it hangs on. Rooms without a board
@@ -1731,7 +1731,7 @@
     }
     // Flat on the wall, like the board. Turning them to face the viewer instead
     // leaves the far edge of a wide logo buried in the wall, looking cut off.
-    let faceYaw = 0;
+    let faceYaw = 0, tall = LOGO_H;
     if (board) {
       x = board.centre[0];
       z = board.centre[2];
@@ -1739,12 +1739,15 @@
       faceYaw = board.yaw || 0;
       spread = board.radius + 0.3;         // clear of the board, still on the wall
     } else if (wall) {
-      // a hall with no board: on the end wall, either side of the middle
+      // A hall with no board: on the end wall, either side of the middle, and
+      // sized to the wall -- a logo that suits a classroom is a stamp across a
+      // sports hall, which is seen from three times as far away.
       x = wall.centre[0];
       z = wall.centre[2];
-      y = 2.7;
+      y = Math.max(2.4, wall.centre[1]);
       faceYaw = Math.atan2(-x, -z);        // turned in towards the room
       spread = 2.6;
+      tall = Math.max(0.9, Math.min(2.2, wall.radius * 0.11));
     } else if (roomHome) {
       const look = roomHome[1];
       const dx = look[0] - eye[0], dz = look[2] - eye[2];
@@ -1761,7 +1764,7 @@
     // pushed out by the same amount do not end up equally clear of the board
     let done = [0, 0];
     logoPanels.forEach((mesh, i) => {
-      sizePanel(mesh);                  // its real width decides where it goes
+      sizePanel(mesh, tall);            // its real width decides where it goes
       const side = i % 2 === 0 ? -1 : 1, lane = i % 2;
       const half = mesh.geometry.parameters.width / 2;
       const out = spread + done[lane] + half;
@@ -1777,7 +1780,7 @@
     for (const mesh of logoPanels) {
       const img = mesh.userData.img;
       if (!img.complete || !img.naturalWidth) continue;
-      sizePanel(mesh);
+      sizePanel(mesh, mesh.userData.sizedFor || LOGO_H);
       const ink = logoInk.get(img)
         || { x: 0, y: 0, w: img.naturalWidth, h: img.naturalHeight };
       const cv = mesh.userData.cv, g = cv.getContext("2d");
