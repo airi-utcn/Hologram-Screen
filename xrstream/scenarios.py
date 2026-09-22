@@ -743,7 +743,8 @@ def build_gym(seed: int = 17, athletes: int = 12,
 
     # wall bars and a spectator bench: the only other static geometry
     b.solid("wall_bars", "furniture", g.merge([
-        g.transform(g.box(3.0, 0.06, 0.06), translate=(-11.0, 0.5 + k * 0.35, -8.7))
+        # left of the logos on the end wall, which a demo puts up there
+        g.transform(g.box(3.0, 0.06, 0.06), translate=(-13.0, 0.5 + k * 0.35, -8.7))
         for k in range(9)
     ]), (0.62, 0.48, 0.32))
     b.solid("bench", "furniture", g.merge([
