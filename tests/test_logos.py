@@ -1,4 +1,4 @@
-"""The two logo folders: one for the page, one for the wall of the room."""
+"""The logo folder behind the page strip and the pair hung in the room."""
 from xrstream import server
 
 
@@ -8,28 +8,23 @@ def test_reports_the_folder_in_name_order(tmp_path, monkeypatch):
     (tmp_path / "logos" / "2-b.png").write_bytes(b"x")
     (tmp_path / "logos" / "1-a.svg").write_bytes(b"x")
     (tmp_path / "logos" / "README.md").write_text("not a logo")
-    assert server.logos()["page"] == ["/client/logos/1-a.svg", "/client/logos/2-b.png"]
+    names = [u.split("?")[0] for u in server.logos()]
+    assert names == ["/client/logos/1-a.svg", "/client/logos/2-b.png"]
 
 
-def test_the_wall_falls_back_to_the_page(tmp_path, monkeypatch):
+def test_each_url_carries_the_files_timestamp(tmp_path, monkeypatch):
+    """A swapped logo must not be served from the browser's cache."""
     monkeypatch.setattr(server, "CLIENT_DIR", tmp_path)
     (tmp_path / "logos").mkdir()
-    (tmp_path / "logos" / "1-a.svg").write_bytes(b"x")
-    out = server.logos()
-    assert out["wall"] == out["page"]
-
-
-def test_a_wall_folder_wins_for_the_room(tmp_path, monkeypatch):
-    """A logo drawn for a white page can be invisible on a dark wall."""
-    monkeypatch.setattr(server, "CLIENT_DIR", tmp_path)
-    (tmp_path / "logos" / "wall").mkdir(parents=True)
-    (tmp_path / "logos" / "1-a.svg").write_bytes(b"x")
-    (tmp_path / "logos" / "wall" / "1-a.svg").write_bytes(b"x")
-    out = server.logos()
-    assert out["page"] == ["/client/logos/1-a.svg"]
-    assert out["wall"] == ["/client/logos/wall/1-a.svg"]
+    f = tmp_path / "logos" / "1-a.svg"
+    f.write_bytes(b"x")
+    first = server.logos()[0]
+    assert "?v=" in first
+    import os
+    os.utime(f, (0, 1_700_000_000))
+    assert server.logos()[0] != first
 
 
 def test_no_folder_is_not_an_error(tmp_path, monkeypatch):
     monkeypatch.setattr(server, "CLIENT_DIR", tmp_path)
-    assert server.logos() == {"page": [], "wall": []}
+    assert server.logos() == []

@@ -588,12 +588,13 @@ def build_chemistry_lab(seed: int = 13, students: int = 8,
         ("result", ["END POINT: 24.5 ML NAOH", "C(HCL) = 0.098 MOL/L"]),
     ])
 
-    # fume hood along the back wall
+    # Fume hood along the left wall, turned a quarter turn to face into the
+    # room. It used to stand against the back wall, where it covered a logo.
     b.solid("fume_hood", "furniture", g.merge([
-        g.transform(g.box(3.2, 0.10, 1.0), translate=(-4.4, 0.95, -5.0)),
-        g.transform(g.box(3.2, 1.30, 0.06), translate=(-4.4, 1.70, -5.45)),
-        g.transform(g.box(0.06, 1.30, 1.0), translate=(-6.0, 1.70, -5.0)),
-        g.transform(g.box(0.06, 1.30, 1.0), translate=(-2.8, 1.70, -5.0)),
+        g.transform(g.box(1.0, 0.10, 3.2), translate=(-7.0, 0.95, -3.0)),
+        g.transform(g.box(0.06, 1.30, 3.2), translate=(-7.45, 1.70, -3.0)),
+        g.transform(g.box(1.0, 1.30, 0.06), translate=(-7.0, 1.70, -4.6)),
+        g.transform(g.box(1.0, 1.30, 0.06), translate=(-7.0, 1.70, -1.4)),
     ]), (0.40, 0.44, 0.50))
 
     # the demonstration bench: small, central, and the reason everyone is here

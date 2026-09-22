@@ -59,18 +59,18 @@ the wall either side of the board, which is the pair a headset can see. Name the
 PNG, JPG, WEBP, SVG and GIF all work, and **an animated GIF keeps animating in VR too** -- the page and the room
 share the same image elements, and drawing one onto a canvas takes whatever frame is showing.
 
-Two things are done for you, because logo files are rarely ready to hang:
+One set of files serves both places, so the **light-on-dark** variant of a logo is the one to use: the walls of
+these rooms are dark, and the page's strip is dark to match. Each URL carries the file's timestamp, so a swapped
+logo is never served from a browser cache that still holds the old one.
 
-- **Blank margin is measured away.** The AIRi file uses 39% of its height and the 5G SHARE one 90%, so at the same
-  file height one would read as half the size of the other. Each is placed by the size of its artwork instead.
-- **A logo for a white page is often invisible on a dark wall.** Anything in `client/logos/wall` is used in the
-  room in place of the page set -- that is where the light-on-dark variant of a logo goes. Without that folder,
-  both places show the same files.
+Blank margin is measured away before a logo is placed. The AIRi file uses 39% of its height and the 5G SHARE one
+90%, so at the same file height one would read as half the size of the other; each is placed by the size of its
+artwork instead. A logo with a solid white background will hang as a white rectangle on a wall, so the files here
+are the background-free ones; the originals are kept in `logo/`.
 
-A logo with a solid white background will hang as a white rectangle on the wall, so the files served here are the
-background-free ones. The originals, cleared and not, are kept in `logo/`.
-
-In a room with no board, such as the sports hall, they hang on the end wall instead, either side of the middle.
+Logos are sized to what they hang on. Beside a board the board sets the scale; on a plain wall they scale with the
+wall, because a sports hall is seen from three times as far away as a classroom. In a room with no board they hang
+on the end wall, either side of the middle.
 
 ## Watching from a headset (WebXR)
 

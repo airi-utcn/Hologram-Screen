@@ -1790,34 +1790,27 @@
     }
   }
 
-  // A GIF only advances while it is in the page, so every image lives in the
-  // document -- the ones meant for the wall in a corner nobody looks at.
-  function loadLogo(url, parent, inPage) {
-    const img = new Image();
-    img.src = url;
-    img.alt = "";
-    parent.appendChild(img);
-    img.addEventListener("load", () => {
-      const ink = inkBox(img);
-      if (ink) {
-        logoInk.set(img, ink);
-        if (inPage) trimInPage(img, ink);
-      }
-      placeBanner();
-      drawBanner();
-    });
-    return img;
-  }
-
   fetch("/logos")
     .then(r => r.json())
-    .then(sets => {
-      const page = sets.page || [], wall = sets.wall || page;
-      if (!page.length && !wall.length) return;
-      logosAnimate = page.concat(wall).some(u => /\.gif$/i.test(u));
+    .then(urls => {
+      if (!urls.length) return;
+      logosAnimate = urls.some(u => /\.gif(\?|$)/i.test(u));
       const strip = $("logos");
-      for (const url of page) loadLogo(url, strip, true);
-      for (const url of wall) logoImgs.push(loadLogo(url, $("logoStore"), false));
+      for (const url of urls) {
+        const img = new Image();
+        img.src = url;
+        img.alt = "";
+        // A GIF only advances while it is in the page, so the strip is also
+        // what keeps the copy hanging in the room moving.
+        strip.appendChild(img);
+        logoImgs.push(img);
+        img.addEventListener("load", () => {
+          const ink = inkBox(img);
+          if (ink) { logoInk.set(img, ink); trimInPage(img, ink); }
+          placeBanner();
+          drawBanner();
+        });
+      }
       buildBanner();
     })
     .catch(() => {});

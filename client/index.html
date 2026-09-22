@@ -72,15 +72,13 @@
             border:4px solid transparent; box-shadow:0 6px 24px rgba(0,0,0,.45); }
   /* kept out of the way of both panels, and kept visible in clean mode: it is
      what a screenshot of the demo should carry */
+  /* dark, because one set of logos serves both here and the room, and the
+     room's walls are dark */
   #logos { position:fixed; top:14px; left:50%; transform:translateX(-50%); z-index:5;
            display:flex; align-items:center; gap:20px; padding:9px 18px;
-           background:rgba(255,255,255,0.93); border-radius:12px;
-           box-shadow:0 4px 18px rgba(0,0,0,.35); pointer-events:none; }
+           background:rgba(9,13,19,0.88); border:1px solid #232b3a; border-radius:12px;
+           box-shadow:0 4px 18px rgba(0,0,0,.45); pointer-events:none; }
   #logos:empty { display:none; }
-  /* the copies the room uses: kept in the page because that is what keeps an
-     animated GIF running, but out of sight and out of the way */
-  #logoStore { position:fixed; left:0; bottom:0; width:1px; height:1px;
-               overflow:hidden; opacity:0.01; pointer-events:none; z-index:-1; }
   #logos img { height:38px; width:auto; display:block; }
   #vr { position:fixed; right:16px; bottom:56px; z-index:6; cursor:pointer;
         background:var(--acc); color:#08121c; border:none; border-radius:999px;
@@ -165,7 +163,6 @@
 </div>
 
 <div id="logos"></div>
-<div id="logoStore" aria-hidden="true"></div>
 <button id="vr" hidden>🥽 Enter VR</button>
 <div id="caption" class="panel" hidden>
   <div class="step" id="capStep"></div>

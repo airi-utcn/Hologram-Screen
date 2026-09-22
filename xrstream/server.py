@@ -106,28 +106,45 @@ app.mount("/client", StaticFiles(directory=CLIENT_DIR), name="client")
 LOGO_TYPES = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"}
 
 
-def _images_in(folder: pathlib.Path) -> list[str]:
-    if not folder.is_dir():
-        return []
-    rel = folder.relative_to(CLIENT_DIR).as_posix()
-    return [f"/client/{rel}/{f.name}" for f in sorted(folder.iterdir())
-            if f.suffix.lower() in LOGO_TYPES]
-
-
 @app.get("/logos")
-def logos() -> dict[str, list[str]]:
+def logos() -> list[str]:
     """Whatever images sit in client/logos, in name order.
 
     Read from the folder rather than written into the page, so that a logo is
     added by dropping the file in -- and so that a lab can put its own there
     without touching the viewer. Name them 1-..., 2-... to fix their order.
-
-    The page shows what is in the folder; the wall of the room shows what is in
-    `logos/wall`, if anything, because a logo drawn for a white page can be
-    invisible on a dark wall. With no wall folder, both show the same files.
     """
-    page = _images_in(CLIENT_DIR / "logos")
-    return {"page": page, "wall": _images_in(CLIENT_DIR / "logos" / "wall") or page}
+    folder = CLIENT_DIR / "logos"
+    if not folder.is_dir():
+        return []
+    # the file's own timestamp rides along, so a swapped logo cannot be served
+    # from a browser cache that still holds the old one
+    return [f"/client/logos/{f.name}?v={int(f.stat().st_mtime)}"
+            for f in sorted(folder.iterdir())
+            if f.suffix.lower() in LOGO_TYPES]
+
+
+@app.middleware("http")
+async def no_stale_client(request, call_next):
+    """Never let the browser reuse an old copy of the viewer.
+
+    A cached index.html next to a fresh main.js (or the reverse) half-works in
+    confusing ways -- an empty board, missing buttons -- after every update.
+    """
+    response = await call_next(request)
+    if request.url.path == "/" or request.url.path.startswith("/client/"):
+        response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@app.get("/")
+def index():
+    return FileResponse(CLIENT_DIR / "index.html")
+
+
+app.mount("/client", StaticFiles(directory=CLIENT_DIR), name="client")
+
+LOGO_TYPES = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"}
 
 
 @app.websocket("/ws")
