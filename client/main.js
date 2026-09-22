@@ -1626,7 +1626,50 @@
   // same <img> elements feed both, which is what makes an animated GIF animate
   // in VR too -- drawing an img onto a canvas takes the frame showing now.
   const logoImgs = [];
+  const logoInk = new Map();       // img -> the part of the file that is not blank
   let logosAnimate = false, banner = null;
+
+  // Logo files carry wildly different amounts of blank margin -- one of these
+  // uses 39% of its height, the other 90% -- so side by side, at the same file
+  // height, one looks half the size of the other. Measure the ink instead.
+  function inkBox(img) {
+    try {
+      const c = document.createElement("canvas");
+      c.width = img.naturalWidth; c.height = img.naturalHeight;
+      const g = c.getContext("2d");
+      g.drawImage(img, 0, 0);
+      const d = g.getImageData(0, 0, c.width, c.height).data;
+      let x0 = c.width, y0 = c.height, x1 = -1, y1 = -1;
+      for (let y = 0; y < c.height; y++) {
+        for (let x = 0; x < c.width; x++) {
+          const i = (y * c.width + x) * 4;
+          if (d[i + 3] > 30 && (d[i] + d[i + 1] + d[i + 2]) / 3 < 245) {
+            if (x < x0) x0 = x;
+            if (x > x1) x1 = x;
+            if (y < y0) y0 = y;
+            if (y > y1) y1 = y;
+          }
+        }
+      }
+      if (x1 < x0 || y1 < y0) return null;
+      return { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
+    } catch (err) {
+      return null;                 // a tainted canvas is not worth failing over
+    }
+  }
+
+  // Scale so the artwork itself is STRIP_H tall, then clip the margin away and
+  // pull the layout back in by the same amount.
+  const STRIP_H = 34;
+  function trimInPage(img, box) {
+    const scale = STRIP_H / box.h;
+    img.style.height = (img.naturalHeight * scale) + "px";
+    const t = box.y * scale, l = box.x * scale;
+    const b = (img.naturalHeight - box.y - box.h) * scale;
+    const r = (img.naturalWidth - box.x - box.w) * scale;
+    img.style.clipPath = "inset(" + t + "px " + r + "px " + b + "px " + l + "px)";
+    img.style.margin = (-t) + "px " + (-r) + "px " + (-b) + "px " + (-l) + "px";
+  }
 
   function buildBanner() {
     const cv = document.createElement("canvas");
@@ -1677,15 +1720,17 @@
 
     roundBox(g, 0, 0, cv.width, cv.height, 34, "rgba(255,255,255,0.94)", null);
     const boxH = 180, gap = 90, pad = 70;
-    const widths = ready.map(im => boxH * im.naturalWidth / im.naturalHeight);
+    const box = im => logoInk.get(im)
+      || { x: 0, y: 0, w: im.naturalWidth, h: im.naturalHeight };
+    const widths = ready.map(im => boxH * box(im).w / box(im).h);
     let total = widths.reduce((a, b) => a + b, 0) + gap * (ready.length - 1);
     let scale = Math.min(1, (cv.width - 2 * pad) / total);
     total *= scale;
     let x = (cv.width - total) / 2;
     const y = (cv.height - boxH * scale) / 2;
     ready.forEach((im, i) => {
-      const w = widths[i] * scale;
-      g.drawImage(im, x, y, w, boxH * scale);
+      const w = widths[i] * scale, k = box(im);
+      g.drawImage(im, k.x, k.y, k.w, k.h, x, y, w, boxH * scale);
       x += w + gap * scale;
     });
     banner.userData.tex.needsUpdate = true;
@@ -1705,7 +1750,12 @@
         // what keeps the copy in VR moving
         strip.appendChild(img);
         logoImgs.push(img);
-        img.addEventListener("load", () => { placeBanner(); drawBanner(); });
+        img.addEventListener("load", () => {
+          const ink = inkBox(img);
+          if (ink) { logoInk.set(img, ink); trimInPage(img, ink); }
+          placeBanner();
+          drawBanner();
+        });
       }
       buildBanner();
     })
