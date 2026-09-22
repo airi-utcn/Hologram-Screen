@@ -67,9 +67,8 @@ Two things are done for you, because logo files are rarely ready to hang:
   room in place of the page set -- that is where the light-on-dark variant of a logo goes. Without that folder,
   both places show the same files.
 
-A logo with a solid white background will hang as a white rectangle on the wall. `5G_SAHRE_Logo.png` arrived that
-way and the copy in `client/logos` has had its background cleared, with the anti-aliased edges unmixed from the
-white they were blended into, so the red stays red against the wall. The original is untouched in `logo/`.
+A logo with a solid white background will hang as a white rectangle on the wall, so the files served here are the
+background-free ones. The originals, cleared and not, are kept in `logo/`.
 
 In a room with no board, such as the sports hall, the logos go on the far wall behind the lesson instead.
 
