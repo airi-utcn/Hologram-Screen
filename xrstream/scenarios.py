@@ -37,9 +37,19 @@ class Scenario:
     build: Callable[..., Scene]
     paths: dict[str, list] = field(default_factory=dict)
     default_path: str = "walk"
+    # Where a person is put when the room opens. A benchmark path starts where
+    # it has to start for the measurement, which is not always somewhere you
+    # would want to stand -- the sports hall path begins outside the court.
+    home: tuple[float, float, float] | None = None
+    look: tuple[float, float, float] | None = None
 
     def path(self, name: str | None = None):
         return self.paths[name or self.default_path]
+
+    def viewpoint(self):
+        """(eye, look) for a viewer arriving in this room."""
+        _t, eye, look = self.path()[0]
+        return (list(self.home or eye), list(self.look or look))
 
 
 # --------------------------------------------------------------------------
@@ -1168,7 +1178,10 @@ REGISTRY: dict[str, Scenario] = {
                  build_chemistry_lab, CHEMISTRY_PATHS),
         Scenario("gym", "PE class (sports hall)",
                  "Many fast-moving people over a large hall; rapid camera sweeps.",
-                 build_gym, GYM_PATHS),
+                 build_gym, GYM_PATHS,
+                 # inside the hall, at the edge of the court, rather than the
+                 # path's own start, which is behind the south goal
+                 home=(0.0, 1.85, 7.6), look=(0.0, 1.3, 0.2)),
         Scenario("hazard_lab", "Hazard lab (virtual only)",
                  "Dangerous experiments up close: explosions, molten iron, fireballs.",
                  build_hazard_lab, HAZARD_PATHS),

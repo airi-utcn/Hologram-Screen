@@ -70,7 +70,7 @@ Two things are done for you, because logo files are rarely ready to hang:
 A logo with a solid white background will hang as a white rectangle on the wall, so the files served here are the
 background-free ones. The originals, cleared and not, are kept in `logo/`.
 
-In a room with no board, such as the sports hall, the logos go on the far wall behind the lesson instead.
+In a room with no board, such as the sports hall, they hang on the end wall instead, either side of the middle.
 
 ## Watching from a headset (WebXR)
 
@@ -349,6 +349,10 @@ counts for zero. **QoE** = 1 − weighted mean penalty.
 - **Interruptible downloads:** prefetching one big model on a slow link held every live participant behind it.
 - **Frustum planes were rebuilt for every object:** caching them per camera made a server tick 4–5× faster
   (10.6 → 2.3 ms in the lecture), and the test suite 3.6× faster.
+- **The old room's people stayed in the new one:** sending geometry and reading messages are separate tasks on one
+  socket, so a lesson change could land between two chunks of a batch and the rest of the old room arrived after the
+  reset -- the previous class, standing still, among the new one. Each scene now carries a generation number: the
+  sending loop stops when its own generation is over, and the viewer drops a chunk from a generation it has left.
 - **Stale viewer in the browser cache:** the server now forbids caching the viewer's files, so an update can't leave
   an old page talking to a new server.
 - **Occluders as capsules:** people are tested as upright capsules, not bounding spheres; a sphere cannot tell a head

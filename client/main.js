@@ -159,6 +159,7 @@
   const shown = new Map();      // oid -> the variant currently on screen
   const current = new Map();    // oid -> { state, t0 } the lesson says it is in
   const people = new Map();     // oid -> { obj3d, level } live participants
+  let sceneEpoch = 0;           // which generation of the scene we are showing
   let received = 0, receivedBytes = 0;
   const tinted = () => document.getElementById("lodTint").checked;
 
@@ -238,6 +239,9 @@
     const view = new DataView(data);
     const hlen = view.getUint32(0, true);
     const h = JSON.parse(new TextDecoder().decode(new Uint8Array(data, 4, hlen)));
+    // A chunk of the room we just left would otherwise be added to the new one
+    // and stand there for good: the people of the old lesson, frozen in place.
+    if (h.e !== undefined && h.e !== sceneEpoch) return;
     let body = new Uint8Array(data, 4 + hlen);
     if (h.z) body = await inflate(body);
     received++; receivedBytes += data.byteLength;
@@ -863,6 +867,7 @@
       const msg = JSON.parse(ev.data);
       if (msg.type === "manifest") onManifest(msg);
       else if (msg.type === "reset") {
+        if (msg.epoch !== undefined) sceneEpoch = msg.epoch;
         clearScene(); qoeHistory.length = 0; rate.t = 0; rate.bytes = 0;
         spoken = ""; lessonT = 0; lessonAt = performance.now();
         if (pausedAt) { pausedAt = 0; $("pause").textContent = "⏸ Pause";
@@ -880,6 +885,7 @@
   }
 
   function onManifest(m) {
+    if (m.epoch !== undefined) sceneEpoch = m.epoch;
     meta.clear();
     for (const o of m.objects) meta.set(o.oid, o);
     setStates(m.states);
@@ -1717,10 +1723,11 @@
     if (!logoPanels.length) return;
     const eye = roomHome ? roomHome[0] : [0, 1.65, 7];
     let x = 0, z = -5.6, y = 2.1, spread = 4.2;
-    let board = null;
+    let board = null, wall = null;
     for (const entry of meta) {
       const m = entry[1];
-      if (/board|screen/i.test(m.name)) { board = m; break; }
+      if (!board && /board|screen/i.test(m.name)) board = m;
+      if (!wall && /end_wall|back_wall/i.test(m.name)) wall = m;
     }
     // Flat on the wall, like the board. Turning them to face the viewer instead
     // leaves the far edge of a wide logo buried in the wall, looking cut off.
@@ -1731,6 +1738,13 @@
       y = Math.max(1.5, board.centre[1]);
       faceYaw = board.yaw || 0;
       spread = board.radius + 0.3;         // clear of the board, still on the wall
+    } else if (wall) {
+      // a hall with no board: on the end wall, either side of the middle
+      x = wall.centre[0];
+      z = wall.centre[2];
+      y = 2.7;
+      faceYaw = Math.atan2(-x, -z);        // turned in towards the room
+      spread = 2.6;
     } else if (roomHome) {
       const look = roomHome[1];
       const dx = look[0] - eye[0], dz = look[2] - eye[2];

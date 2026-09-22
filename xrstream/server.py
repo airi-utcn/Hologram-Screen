@@ -25,7 +25,7 @@ look at once if it already holds it, otherwise when the geometry arrives.
 
 Protocol (server -> client)
     text   {"type": "manifest", ...}                 on connect and after config
-    text   {"type": "reset"}                         drop everything and restart
+    text   {"type": "reset", "epoch": n}             drop everything and restart
     text   {"type": "metrics", ...}                  ~5 Hz
     binary [u32 header_len][json header][payload]    one per delivered chunk
 """
@@ -77,10 +77,9 @@ def scenario_list() -> list[dict]:
     """
     out = []
     for s in scenarios.REGISTRY.values():
-        _t, eye, look = s.path()[0]
+        eye, look = s.viewpoint()
         out.append({"name": s.name, "title": s.title, "blurb": s.blurb,
-                    "paths": list(s.paths), "home": list(eye),
-                    "look": list(look)})
+                    "paths": list(s.paths), "home": eye, "look": look})
     return out
 
 
@@ -143,9 +142,14 @@ async def stream(ws: WebSocket):
     lesson_keys = None     # its generated camera path
     autopilot = False
     paused = False         # a paused lesson's clock does not move
+    # Sending geometry and handling messages are separate tasks on one socket,
+    # so a room can be swapped while a batch from the old one is half sent. This
+    # generation number tells both ends which scene a chunk belongs to.
+    epoch = 0
 
     def manifest() -> str:
         m = sess.manifest()
+        m["epoch"] = epoch
         m["scenario"] = scenario
         m["scenarios"] = scenario_list()
         m["lessons"] = lesson_list()
@@ -157,7 +161,7 @@ async def stream(ws: WebSocket):
     await ws.send_text(manifest())
 
     async def receive():
-        nonlocal cam, sess, scenario, lesson, lesson_keys, autopilot, paused
+        nonlocal cam, sess, scenario, lesson, lesson_keys, autopilot, paused, epoch
         while True:
             msg = json.loads(await ws.receive_text())
             kind = msg.get("type")
@@ -180,7 +184,8 @@ async def stream(ws: WebSocket):
                 sess.state.context = lesson.context(sess.state.t)
                 sess._apply_lesson(sess.state)
                 autopilot, paused = True, False
-                await ws.send_text(json.dumps({"type": "reset"}))
+                epoch += 1
+                await ws.send_text(json.dumps({"type": "reset", "epoch": epoch}))
                 await ws.send_text(manifest())
             elif kind == "config" and "lesson" in msg:
                 name = msg.get("lesson") or ""
@@ -200,8 +205,9 @@ async def stream(ws: WebSocket):
                     lesson, lesson_keys, autopilot = None, None, False
                     sess = StreamSession(get_scene(scenario), policy=sess.policy,
                                          link=sess.link)
+                epoch += 1
                 await ws.send_text(manifest())
-                await ws.send_text(json.dumps({"type": "reset"}))
+                await ws.send_text(json.dumps({"type": "reset", "epoch": epoch}))
             elif kind == "config":
                 want = msg.get("scenario", scenario)
                 restart = bool(msg.get("restart"))
@@ -231,8 +237,9 @@ async def stream(ws: WebSocket):
                         autopilot = True
                     paused = False
                     sess.reset()
+                    epoch += 1
                     await ws.send_text(manifest())
-                    await ws.send_text(json.dumps({"type": "reset"}))
+                    await ws.send_text(json.dumps({"type": "reset", "epoch": epoch}))
 
     rx = asyncio.create_task(receive())
     last = time.perf_counter()
@@ -261,8 +268,11 @@ async def stream(ws: WebSocket):
                 await ws.send_text(json.dumps({
                     "type": "states",
                     "states": {str(k): v for k, v in res.state_changes.items()}}))
+            sending = epoch
             for ch in res.chunks:
-                await ws.send_bytes(codec.frame(ch.header, ch.body))
+                if epoch != sending:
+                    break          # the room changed under us: these are stale
+                await ws.send_bytes(codec.frame({**ch.header, "e": epoch}, ch.body))
             if now - last_metrics > 0.2:
                 last_metrics = now
                 extra = {}
