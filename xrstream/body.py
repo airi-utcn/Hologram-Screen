@@ -19,6 +19,7 @@ so one encoded capture can serve every participant in the same pose.
 """
 from __future__ import annotations
 
+import itertools
 import math
 from collections import OrderedDict
 from dataclasses import dataclass, field, replace
@@ -571,8 +572,13 @@ class Body:
     """A participant's capture template: points sampled once on each segment,
     skinned onto any pose on demand, with a limb-preserving LOD chain."""
 
+    #: a number of its own for every body ever built, because the capture cache
+    #: has to tell two people apart for longer than either of them lives
+    _next_uid = itertools.count(1)
+
     def __init__(self, n_points: int, palette: dict, scale: float = 1.0,
                  seed: int = 0, n_levels: int = 4):
+        self.uid = next(Body._next_uid)
         self.scale = scale
         self.palette = {k: np.asarray(v, dtype=np.float64)
                         for k, v in {**HEADSET, **palette}.items()}
@@ -666,7 +672,11 @@ class CaptureCache:
         self.hits = self.misses = 0
 
     def get(self, body: Body, pose: Pose, level: int, make):
-        key = (id(body), pose.key(), level)
+        # Keyed by the body's own number, not by id(): Python reuses the
+        # address of a body that has been collected, and a cache that keys on
+        # it hands the next person the previous person's points -- which ends
+        # as an index error when the two were sampled at different densities.
+        key = (body.uid, pose.key(), level)
         if key in self.store:
             self.store.move_to_end(key)
             self.hits += 1
