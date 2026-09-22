@@ -31,7 +31,7 @@ def test_a_crowded_cell_is_where_sharing_pays():
 
 def test_television_serves_the_room_but_not_the_person():
     """Broadcast alone cannot answer what one student needs and others do not."""
-    tv = cell.run(mode="broadcast", students=2, mbps=25, lesson="anatomy", seconds=6)
+    tv = cell.run(mode="shared", students=2, mbps=25, lesson="anatomy", seconds=6)
     hub = cell.run(mode="hub", students=2, mbps=25, lesson="anatomy", seconds=6)
     assert hub.worst_qoe > tv.worst_qoe
 
@@ -98,7 +98,7 @@ def test_a_scattered_class_shares_less_and_the_hub_notices():
 
 def test_pricing_beats_broadcasting_when_the_class_scatters():
     """The point of pricing per byte: television cannot answer one student."""
-    tv = cell.run(mode="broadcast", students=12, mbps=15, lesson="titration",
+    tv = cell.run(mode="shared", students=12, mbps=15, lesson="titration",
                   seconds=6, attention=0.5)
     ours = cell.run(mode="hub", students=12, mbps=15, lesson="titration",
                     seconds=6, attention=0.5)

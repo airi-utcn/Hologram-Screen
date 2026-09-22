@@ -19,9 +19,14 @@ Four schedulers, deliberately comparable:
               on their own, pay for every copy
   fair        the same, except bandwidth nobody used goes to the worst-served
               student instead of being wasted
-  broadcast   one stream for the room and nothing personal: television
-  hub         ours: what the plan says the class has in common is sent once,
-              and the rest is spent worst-student-first
+  shared      send each piece once for everyone waiting on it, in the order the
+              lesson plan ranks them
+  hub         the same sharing, but each candidate priced by what it is worth
+              to the room over what it costs to put on the air
+
+The gap between those last two is worth stating plainly, because the numbers
+do: most of what there is to win comes from sharing at all, and pricing adds a
+smaller margin on top -- one that grows as the class stops moving together.
 
 The number that matters is not the average student. It is the worst one: a hub
 where two children at the back cannot read the board has failed, however good
@@ -39,11 +44,7 @@ from .link import Link
 from .session import StreamSession, Transfer
 
 #: schedulers this module can run, in the order they are worth reading
-MODES = ("unicast", "fair", "broadcast", "hub")
-
-#: at most this share of a tick may go on what the class has in common, so a
-#: student whose view differs is never starved by the broadcast
-COMMON_CAP = 0.8
+MODES = ("unicast", "fair", "shared", "hub")
 
 #: how many students must want the same geometry before it is worth sending
 #: once for all of them rather than to each in turn
@@ -286,7 +287,7 @@ class Cell:
 
         if self.mode == "hub":
             budget -= self._pour_by_value(budget)
-        elif self.mode == "broadcast":
+        elif self.mode == "shared":
             budget -= self._pour_common(budget)
         else:
             budget -= self._pour_personal(budget)
@@ -320,7 +321,10 @@ class Cell:
                 slot["level"] = min(slot["level"], level)
                 slot["priority"] += float(req[3]) if len(req) > 3 else 1.0
                 slot["who"].append(w)
-        out = [(k, v) for k, v in wanted.items() if len(v["who"]) >= SHARE_MIN]
+        # Plain sharing carries whatever anyone waits for, even when that is
+        # one person; the hub shares only where sharing actually saves.
+        floor = 1 if self.mode == "shared" else SHARE_MIN
+        out = [(k, v) for k, v in wanted.items() if len(v["who"]) >= floor]
         out.sort(key=lambda kv: -kv[1]["priority"])
         return out
 
@@ -342,7 +346,7 @@ class Cell:
             oid, pose, state = key
             takers = [w for w in slot["who"]
                       if w.wants(oid, slot["level"], pose if pose >= 0 else 0, state)]
-            if len(takers) < SHARE_MIN:
+            if len(takers) < (1 if self.mode == "shared" else SHARE_MIN):
                 continue
             tr = self._build(takers[0], oid, slot["level"], pose, state)
             if tr is None:

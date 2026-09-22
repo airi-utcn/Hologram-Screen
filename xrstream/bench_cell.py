@@ -42,7 +42,8 @@ SWEEPS = {
 }
 
 LABELS = {"unicast": "a stream each", "fair": "a stream each, leftovers shared",
-          "broadcast": "one stream for the room", "hub": "priced per byte (ours)"}
+          "shared": "sent once for everyone waiting",
+          "hub": "sent once, priced per byte (ours)"}
 
 
 def sweep(name: str, lesson: str, seconds: float, base: dict) -> list[dict]:
@@ -67,7 +68,7 @@ def sweep(name: str, lesson: str, seconds: float, base: dict) -> list[dict]:
 
 def chart(rows: list[dict], name: str, out: pathlib.Path) -> None:
     field, values = SWEEPS[name]
-    fig, axes = plt.subplots(1, 2, figsize=(11, 4.2), sharex=True)
+    fig, axes = plt.subplots(1, 3, figsize=(15, 4.2), sharex=True)
     for mode in cell.MODES:
         got = [r for r in rows if r["mode"] == mode]
         xs = [r[field] for r in got]
@@ -75,14 +76,20 @@ def chart(rows: list[dict], name: str, out: pathlib.Path) -> None:
                      label=LABELS.get(mode, mode))
         axes[1].plot(xs, [r["worst_qoe"] for r in got], marker="o",
                      label=LABELS.get(mode, mode))
+        axes[2].plot(xs, [r["cell_mbytes"] for r in got], marker="o",
+                     label=LABELS.get(mode, mode))
     titles = {"size": "students in the class", "bandwidth": "cell capacity (Mbit/s)",
               "attention": "share of the class following the lesson"}
-    for ax, what in zip(axes, ("the average student", "the worst-served student")):
+    for ax, what in zip(axes, ("the average student", "the worst-served student",
+                               "what the cell carried")):
         ax.set_xlabel(titles[name])
-        ax.set_ylabel("picture quality (0-1)")
         ax.set_title(what)
-        ax.set_ylim(0, 1)
         ax.grid(alpha=0.3)
+    for ax in axes[:2]:
+        ax.set_ylabel("picture quality (0-1)")
+        ax.set_ylim(0, 1)
+    axes[2].set_ylabel("megabytes on the air")
+    axes[2].set_yscale("log")
     axes[0].legend(fontsize=8)
     fig.tight_layout()
     fig.savefig(out, dpi=140)
@@ -99,12 +106,23 @@ def main() -> None:
     ap.add_argument("--mbps", type=float, default=25.0)
     ap.add_argument("--attention", type=float, default=0.75)
     ap.add_argument("--out", default=str(OUT))
+    ap.add_argument("--replot", action="store_true",
+                    help="redraw the charts from the last run, without running it")
     args = ap.parse_args()
 
     out = pathlib.Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     base = {"students": args.students, "mbps": args.mbps, "attention": args.attention}
     names = list(SWEEPS) if args.sweep == "all" else [args.sweep]
+
+    if args.replot:
+        saved = json.loads((out / "cell.json").read_text(encoding="utf-8"))
+        for name in SWEEPS:
+            rows = [r for r in saved["rows"] if r["sweep"] == name]
+            if rows:
+                chart(rows, name, out / f"cell_{name}.png")
+        print(f"charts redrawn in {out}")
+        return
 
     every: list[dict] = []
     for name in names:

@@ -212,6 +212,97 @@ once, as a handful of parameters with the geometry, and played by the client aga
 never sends a new mesh per frame for any of it. For known, rule-driven motion this is far cheaper than streaming the
 result, and it is the kind of semantic representation §1.5.7 asks for.
 
+## A whole class on one cell
+
+Everything above measures one person watching a lesson. A teaching hub is a room: a class on one 5G cell, sharing
+whatever it can carry. That turns the question from *what do I send you* into *how do I divide one link between
+twenty people who are, mostly, looking at the same thing* -- and **mostly** is what the lesson plan knows. When the
+plan says the class is watching the titration, that demonstration is one piece of geometry twenty people need at
+the same moment, and it can go out once for all of them rather than twenty times.
+
+```
+python -m xrstream.bench_cell                    # three sweeps -> results/cell
+python -m xrstream.bench_cell --sweep size       # just the class-size curve
+python -m xrstream.bench_cell --replot           # redraw from the last run
+```
+
+Four schedulers, run on the same class, the same lesson and the same link:
+
+| scheduler | what it does |
+|---|---|
+| `unicast` | a stream each: split the cell evenly and pay for every copy |
+| `fair` | the same, but bandwidth nobody used goes to the worst-served student |
+| `shared` | each piece sent once for everyone waiting on it, in the plan's order |
+| `hub` | the same sharing, with every candidate priced by what it is worth to the room over what it costs to send |
+
+The number reported first is **the worst student in the room**, not the average: a cell that serves nineteen
+children well and one badly has not served a class.
+
+### How far a cell stretches
+
+Titration, 25 Mbit/s, 12 seconds of lesson. Quality for the worst-served student, and what the cell carried:
+
+| students | a stream each | shared | priced (ours) | traffic: stream each -> ours |
+|---:|---:|---:|---:|---:|
+| 4 | 0.641 | 0.682 | 0.683 | 36 MB -> 16 MB |
+| 8 | 0.484 | 0.519 | 0.522 | 35 MB -> 9 MB |
+| 16 | 0.356 | 0.406 | 0.408 | 32 MB -> 7 MB |
+| 24 | 0.315 | 0.390 | 0.397 | 31 MB -> 6 MB |
+| 32 | 0.289 | 0.385 | 0.396 | 36 MB -> 6 MB |
+
+Per-student streaming decays with every child added; sharing flattens out. By thirty-two students it is **37%
+better for the worst-served child on a sixth of the traffic** -- and the traffic *falls* as the class grows,
+because a bigger class shares more of what it needs.
+
+### What a hub has to buy
+
+Sixteen students, same lesson. The worst-served student against cell capacity:
+
+| cell | a stream each | priced (ours) |
+|---:|---:|---:|
+| 5 Mbit/s | 0.187 | 0.358 |
+| 10 Mbit/s | 0.272 | 0.377 |
+| 25 Mbit/s | 0.356 | 0.408 |
+| 50 Mbit/s | 0.444 | 0.502 |
+| 100 Mbit/s | 0.525 | 0.659 |
+
+At 5 Mbit/s the worst child is **91% better off**. That is the argument for a hub on a link nobody would call
+fast, which is the case the project is named for.
+
+### What if the class does not follow the plan
+
+A scheduler that reads a lesson plan and is only ever tested on students who follow it is measuring itself. So
+`attention` is a parameter: the share of the class actually watching the lesson. The rest arrive a second and a
+half late, watch a neighbour, or let their eyes wander.
+
+Sixteen students, 25 Mbit/s, worst-served student:
+
+| following the plan | shared | priced (ours) | ours over sharing |
+|---:|---:|---:|---:|
+| all | 0.407 | 0.410 | +0.003 |
+| three quarters | 0.406 | 0.408 | +0.002 |
+| half | 0.418 | 0.423 | +0.005 |
+| a quarter | 0.354 | 0.384 | +0.030 |
+| none | 0.363 | 0.368 | +0.005 |
+
+The advantage over plain sharing is small when the room moves together -- correctly, because then there is nothing
+to decide -- and grows when it scatters, which is when a single stream starts failing the children looking
+somewhere else.
+
+### Say these out loud too
+
+**Most of the win is sharing, not pricing.** Sending a piece once for everyone waiting on it is what turns 32 MB
+into 6 MB and carries the worst student from 0.29 to 0.39. Pricing each candidate adds a further margin that is
+real and consistent but much smaller, and it earns its keep mainly when the class stops moving together. Reporting
+it the other way round would be dishonest.
+
+**The average student improves past sixteen, and that is an artefact.** A bigger class is seated further back,
+where less detail is required of the same room. Read the worst-student column, which does not flatter itself that
+way.
+
+**Students here sit still.** They look where the plan says, at a neighbour, or around the room, but nobody gets up
+and walks to the front. Real head motion would make the personal half of the problem harder.
+
 ## Results: lessons
 
 `results/lessons/lessons.md` has every policy at 3/10/25/50 Mbit/s. At 10 Mbit/s (typical home Wi-Fi):
