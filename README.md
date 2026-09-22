@@ -52,13 +52,24 @@ the other way round: run a lesson at 3 Mbit/s until it looks broken, then press 
 
 ## Logos
 
-Drop image files into `client/logos` and they appear in two places: a strip across the top of the page, and a board
-hung above the whiteboard inside the room, which is the one a headset can see. Name them `1-institute.png`,
-`2-project.gif` to fix the order.
+Drop image files into `client/logos` and they appear in two places: a strip across the top of the page, and hung on
+the wall either side of the board, which is the pair a headset can see. Name them `1-institute.png`,
+`2-project.gif` to fix their order; with more than two, they alternate left and right.
 
 PNG, JPG, WEBP, SVG and GIF all work, and **an animated GIF keeps animating in VR too** -- the page and the room
-share the same image elements, and drawing one onto a canvas takes whatever frame is showing. Nothing needs
-editing to add or swap a logo: the viewer asks the server what is in the folder.
+share the same image elements, and drawing one onto a canvas takes whatever frame is showing.
+
+Two things are done for you, because logo files are rarely ready to hang:
+
+- **Blank margin is measured away.** The AIRi file uses 39% of its height and the 5G SHARE one 90%, so at the same
+  file height one would read as half the size of the other. Each is placed by the size of its artwork instead.
+- **A logo for a white page is often invisible on a dark wall.** Anything in `client/logos/wall` is used in the
+  room in place of the page set -- that is where the light-on-dark variant of a logo goes. Without that folder,
+  both places show the same files.
+
+A logo with a solid white background will hang as a white rectangle on the wall. `5G_SAHRE_Logo.png` arrived that
+way and the copy in `client/logos` has had its background cleared, with the anti-aliased edges unmixed from the
+white they were blended into, so the red stays red against the wall. The original is untouched in `logo/`.
 
 In a room with no board, such as the sports hall, the logos go on the far wall behind the lesson instead.
 

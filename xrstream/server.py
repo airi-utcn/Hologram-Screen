@@ -107,19 +107,28 @@ app.mount("/client", StaticFiles(directory=CLIENT_DIR), name="client")
 LOGO_TYPES = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"}
 
 
+def _images_in(folder: pathlib.Path) -> list[str]:
+    if not folder.is_dir():
+        return []
+    rel = folder.relative_to(CLIENT_DIR).as_posix()
+    return [f"/client/{rel}/{f.name}" for f in sorted(folder.iterdir())
+            if f.suffix.lower() in LOGO_TYPES]
+
+
 @app.get("/logos")
-def logos() -> list[str]:
+def logos() -> dict[str, list[str]]:
     """Whatever images sit in client/logos, in name order.
 
     Read from the folder rather than written into the page, so that a logo is
     added by dropping the file in -- and so that a lab can put its own there
     without touching the viewer. Name them 1-..., 2-... to fix their order.
+
+    The page shows what is in the folder; the wall of the room shows what is in
+    `logos/wall`, if anything, because a logo drawn for a white page can be
+    invisible on a dark wall. With no wall folder, both show the same files.
     """
-    folder = CLIENT_DIR / "logos"
-    if not folder.is_dir():
-        return []
-    return [f"/client/logos/{f.name}" for f in sorted(folder.iterdir())
-            if f.suffix.lower() in LOGO_TYPES]
+    page = _images_in(CLIENT_DIR / "logos")
+    return {"page": page, "wall": _images_in(CLIENT_DIR / "logos" / "wall") or page}
 
 
 @app.websocket("/ws")

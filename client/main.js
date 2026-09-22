@@ -1627,7 +1627,7 @@
   // in VR too -- drawing an img onto a canvas takes the frame showing now.
   const logoImgs = [];
   const logoInk = new Map();       // img -> the part of the file that is not blank
-  let logosAnimate = false, banner = null;
+  let logosAnimate = false;
 
   // Logo files carry wildly different amounts of blank margin -- one of these
   // uses 39% of its height, the other 90% -- so side by side, at the same file
@@ -1639,11 +1639,18 @@
       const g = c.getContext("2d");
       g.drawImage(img, 0, 0);
       const d = g.getImageData(0, 0, c.width, c.height).data;
+      // A logo drawn on transparency tells us where it is by its alpha, and
+      // that is the only rule that works for white artwork as well as dark.
+      // Only a file with no transparency at all has to be read by brightness.
+      let clear = false;
+      for (let i = 3; i < d.length; i += 4) if (d[i] < 10) { clear = true; break; }
       let x0 = c.width, y0 = c.height, x1 = -1, y1 = -1;
       for (let y = 0; y < c.height; y++) {
         for (let x = 0; x < c.width; x++) {
           const i = (y * c.width + x) * 4;
-          if (d[i + 3] > 30 && (d[i] + d[i + 1] + d[i + 2]) / 3 < 245) {
+          const ink = clear ? d[i + 3] > 30
+            : (d[i] + d[i + 1] + d[i + 2]) / 3 < 245;
+          if (ink) {
             if (x < x0) x0 = x;
             if (x > x1) x1 = x;
             if (y < y0) y0 = y;
@@ -1671,92 +1678,121 @@
     img.style.margin = (-t) + "px " + (-r) + "px " + (-b) + "px " + (-l) + "px";
   }
 
+  const LOGO_H = 0.7;              // how tall a logo hangs on the wall, in metres
+  const logoPanels = [];
+
   function buildBanner() {
-    const cv = document.createElement("canvas");
-    cv.width = 1400; cv.height = 300;
-    const tex = new THREE.CanvasTexture(cv);
-    banner = new THREE.Mesh(
-      new THREE.PlaneGeometry(2.6, 2.6 * 300 / 1400),
-      new THREE.MeshBasicMaterial({ map: tex, transparent: true }));
-    banner.userData = { cv, tex };
-    banner.visible = false;
-    scene.add(banner);
+    for (const img of logoImgs) {
+      const cv = document.createElement("canvas");
+      cv.width = 512; cv.height = 256;
+      const tex = new THREE.CanvasTexture(cv);
+      const mesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(LOGO_H * 2, LOGO_H),
+        new THREE.MeshBasicMaterial({ map: tex, transparent: true }));
+      mesh.userData = { cv, tex, img, sized: false };
+      mesh.visible = false;
+      scene.add(mesh);
+      logoPanels.push(mesh);
+    }
     placeBanner();
+    drawBanner();
   }
 
-  // Above the board, turned towards where the room puts a viewer. Rooms differ,
-  // so fall back to the point the room asks the viewer to look at.
+  // Each logo keeps its own shape: a wide one stays wide, and both hang the
+  // same height, which is what makes them read as a pair.
+  function sizePanel(mesh) {
+    const ink = logoInk.get(mesh.userData.img);
+    if (!ink || mesh.userData.sized) return;
+    const aspect = ink.w / ink.h;
+    mesh.userData.cv.width = Math.max(16, Math.round(256 * aspect));
+    mesh.userData.cv.height = 256;
+    mesh.geometry.dispose();
+    mesh.geometry = new THREE.PlaneGeometry(LOGO_H * aspect, LOGO_H);
+    mesh.userData.sized = true;
+  }
+
+  // One each side of the board, on the wall it hangs on. Rooms without a board
+  // put them on the far wall behind the lesson instead.
   function placeBanner() {
-    if (!banner) return;
-    let x = 0, z = -5.6;
+    if (!logoPanels.length) return;
+    const eye = roomHome ? roomHome[0] : [0, 1.65, 7];
+    let x = 0, z = -5.6, y = 2.1, spread = 4.2;
     let board = null;
     for (const entry of meta) {
       const m = entry[1];
       if (/board|screen/i.test(m.name)) { board = m; break; }
     }
-    const eye = roomHome ? roomHome[0] : [0, 1.65, 7];
     if (board) {
-      x = board.centre[0]; z = board.centre[2];
+      x = board.centre[0];
+      z = board.centre[2];
+      y = Math.max(1.5, board.centre[1]);
+      spread = board.radius + 0.3;         // clear of the board, still on the wall
     } else if (roomHome) {
-      // no board in this room: carry on past what the room asks you to watch,
-      // so the logos end up on the far wall rather than floating over the class
       const look = roomHome[1];
       const dx = look[0] - eye[0], dz = look[2] - eye[2];
       const len = Math.hypot(dx, dz) || 1;
       x = look[0] + (dx / len) * 3.5;
       z = look[2] + (dz / len) * 3.5;
+      y = 2.6;
     }
-    banner.position.set(x, 3.25, z + (board ? 0.1 : 0));
-    banner.lookAt(eye[0], 3.25, eye[2]);
-    banner.visible = logoImgs.length > 0;
+
+    // measured from each logo's own edge, because a wide one and a narrow one
+    // pushed out by the same amount do not end up equally clear of the board
+    let done = [0, 0];
+    logoPanels.forEach((mesh, i) => {
+      sizePanel(mesh);                  // its real width decides where it goes
+      const side = i % 2 === 0 ? -1 : 1, lane = i % 2;
+      const half = mesh.geometry.parameters.width / 2;
+      const out = spread + done[lane] + half;
+      done[lane] += 2 * half + 0.4;
+      mesh.position.set(x + side * out, y, z + 0.06);
+      mesh.lookAt(eye[0], y, eye[2]);
+      mesh.visible = true;
+    });
   }
 
   function drawBanner() {
-    if (!banner) return;
-    const cv = banner.userData.cv, g = cv.getContext("2d");
-    const ready = logoImgs.filter(im => im.complete && im.naturalWidth);
-    g.clearRect(0, 0, cv.width, cv.height);
-    if (!ready.length) return;
+    for (const mesh of logoPanels) {
+      const img = mesh.userData.img;
+      if (!img.complete || !img.naturalWidth) continue;
+      sizePanel(mesh);
+      const ink = logoInk.get(img)
+        || { x: 0, y: 0, w: img.naturalWidth, h: img.naturalHeight };
+      const cv = mesh.userData.cv, g = cv.getContext("2d");
+      g.clearRect(0, 0, cv.width, cv.height);
+      g.drawImage(img, ink.x, ink.y, ink.w, ink.h, 0, 0, cv.width, cv.height);
+      mesh.userData.tex.needsUpdate = true;
+    }
+  }
 
-    roundBox(g, 0, 0, cv.width, cv.height, 34, "rgba(255,255,255,0.94)", null);
-    const boxH = 180, gap = 90, pad = 70;
-    const box = im => logoInk.get(im)
-      || { x: 0, y: 0, w: im.naturalWidth, h: im.naturalHeight };
-    const widths = ready.map(im => boxH * box(im).w / box(im).h);
-    let total = widths.reduce((a, b) => a + b, 0) + gap * (ready.length - 1);
-    let scale = Math.min(1, (cv.width - 2 * pad) / total);
-    total *= scale;
-    let x = (cv.width - total) / 2;
-    const y = (cv.height - boxH * scale) / 2;
-    ready.forEach((im, i) => {
-      const w = widths[i] * scale, k = box(im);
-      g.drawImage(im, k.x, k.y, k.w, k.h, x, y, w, boxH * scale);
-      x += w + gap * scale;
+  // A GIF only advances while it is in the page, so every image lives in the
+  // document -- the ones meant for the wall in a corner nobody looks at.
+  function loadLogo(url, parent, inPage) {
+    const img = new Image();
+    img.src = url;
+    img.alt = "";
+    parent.appendChild(img);
+    img.addEventListener("load", () => {
+      const ink = inkBox(img);
+      if (ink) {
+        logoInk.set(img, ink);
+        if (inPage) trimInPage(img, ink);
+      }
+      placeBanner();
+      drawBanner();
     });
-    banner.userData.tex.needsUpdate = true;
+    return img;
   }
 
   fetch("/logos")
     .then(r => r.json())
-    .then(urls => {
-      if (!urls.length) return;
-      logosAnimate = urls.some(u => /\.gif$/i.test(u));
+    .then(sets => {
+      const page = sets.page || [], wall = sets.wall || page;
+      if (!page.length && !wall.length) return;
+      logosAnimate = page.concat(wall).some(u => /\.gif$/i.test(u));
       const strip = $("logos");
-      for (const url of urls) {
-        const img = new Image();
-        img.src = url;
-        img.alt = "";
-        // a GIF only advances while it is in the page, so the strip is also
-        // what keeps the copy in VR moving
-        strip.appendChild(img);
-        logoImgs.push(img);
-        img.addEventListener("load", () => {
-          const ink = inkBox(img);
-          if (ink) { logoInk.set(img, ink); trimInPage(img, ink); }
-          placeBanner();
-          drawBanner();
-        });
-      }
+      for (const url of page) loadLogo(url, strip, true);
+      for (const url of wall) logoImgs.push(loadLogo(url, $("logoStore"), false));
       buildBanner();
     })
     .catch(() => {});
