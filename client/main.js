@@ -1722,10 +1722,14 @@
       const m = entry[1];
       if (/board|screen/i.test(m.name)) { board = m; break; }
     }
+    // Flat on the wall, like the board. Turning them to face the viewer instead
+    // leaves the far edge of a wide logo buried in the wall, looking cut off.
+    let faceYaw = 0;
     if (board) {
       x = board.centre[0];
       z = board.centre[2];
       y = Math.max(1.5, board.centre[1]);
+      faceYaw = board.yaw || 0;
       spread = board.radius + 0.3;         // clear of the board, still on the wall
     } else if (roomHome) {
       const look = roomHome[1];
@@ -1734,7 +1738,10 @@
       x = look[0] + (dx / len) * 3.5;
       z = look[2] + (dz / len) * 3.5;
       y = 2.6;
+      faceYaw = Math.atan2(eye[0] - x, eye[2] - z);
     }
+    const nx = Math.sin(faceYaw), nz = Math.cos(faceYaw);   // the way they look
+    const ax = Math.cos(faceYaw), az = -Math.sin(faceYaw);  // along the wall
 
     // measured from each logo's own edge, because a wide one and a narrow one
     // pushed out by the same amount do not end up equally clear of the board
@@ -1745,8 +1752,9 @@
       const half = mesh.geometry.parameters.width / 2;
       const out = spread + done[lane] + half;
       done[lane] += 2 * half + 0.4;
-      mesh.position.set(x + side * out, y, z + 0.06);
-      mesh.lookAt(eye[0], y, eye[2]);
+      mesh.position.set(x + ax * side * out + nx * 0.08, y,
+                        z + az * side * out + nz * 0.08);
+      mesh.rotation.set(0, faceYaw, 0);
       mesh.visible = true;
     });
   }
