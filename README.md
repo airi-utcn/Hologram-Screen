@@ -25,6 +25,11 @@ python -m venv .venv
 Open <http://localhost:8000> and pick **Play a lesson**. The camera follows the lesson by itself, a caption describes
 each step and a voice reads it aloud.
 
+Setting this up on another machine, or reaching it from a headset, is written out in
+[install_readme.md](install_readme.md) -- including the two things that actually cost an afternoon: a Windows
+firewall rule that blocks Python before any allow rule can help, and networks that keep their own devices from
+seeing each other.
+
 | key | what it does |
 |---|---|
 | `Space` or **Pause** | pause / resume the lesson |
