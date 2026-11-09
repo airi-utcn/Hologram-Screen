@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # UC7 — Lesson-aware 3D scene streaming for holographic classrooms
 
 A testbed for **SOTA UC7 §1: Three-Dimensional Scene Representation for Immersive XR Streaming**.
@@ -481,10 +482,176 @@ counts for zero. **QoE** = 1 − weighted mean penalty.
 3. **Independent image-based quality measure**, so policies stop being graded by their own objective.
 4. **Real captures** (e.g. 8i VFB point-cloud sequences) or a trained 3DGS scene.
 5. **Multiple viewers** sharing one uplink, each following the lesson from a different seat.
+=======
+# hologram-oct
+
+This project shows the Python-generated OCT figure (OCT volume and MIRAGE fluid
+segmentation, `W.I._OS.html`) on the **Looking Glass Hololuminescent Display**.
+The hardware and Unity background are in [docs/HOLOGRAM_CONTEXT.md](docs/HOLOGRAM_CONTEXT.md).
+
+```
+ Python script ──► Plotly figure ──► exporter/plotly_to_hld.py ──► out/<scan>/
+                                                                    ├ model.glb   meshes (tissue, IRF, PED, SRF)
+                                                                    ├ volume.u8   OCT intensity grid
+                                                                    └ meta.json   sizes, colours, fluid volumes
+                                                                          │
+                       ┌──────────────────────────────────────────────────┴───────────┐
+          Unity HDRP project (HLD-Templates)                              Browser viewer
+          HLD ▸ Import OCT Export…  →  prefab in ObjectSwitcher           viewer/ (preview, or full-screen on the HLD)
+```
+
+The "js file" is the Plotly figure. `W.I._OS_files/plotly-3.6.0.min.js` is only
+the Plotly library. The data sits inside `W.I._OS.html`, in the
+`Plotly.newPlot(...)` call. The exporter reads it from there.
+
+## 1. Export
+
+```bash
+./export.sh ~/Downloads/W.I._OS.html          # → out/W_I_OS/
+```
+
+It is better to export straight from the Python script that makes the figure.
+Add two lines (see `exporter/example_hook.py`):
+
+```python
+from plotly_to_hld import export_figure
+export_figure(fig, "hologram-oct/out/W_I_OS")
+```
+
+The exporter uses the standard library only (no numpy, no plotly), so it runs
+on any Python 3.8+, including the Windows/Unity PC. It accepts a Plotly `.html`,
+a `fig.write_json()` file, or a live `Figure`.
+
+| option | effect |
+|---|---|
+| `--depth-scale 0.3333` | Undoes the ×3 depth exaggeration from the source figure (true proportions). |
+| `--flip-depth` | Turns the whole scan upside down. |
+| `--volume-depth auto\|same\|mirror` | How the volume relates to the meshes (see below). Default: detect. |
+| `--no-crop` | Keeps the empty vitreous/choroid layers of the volume. |
+
+### ⚠ Bug found in the source figure
+
+In `W.I._OS.html` the grayscale volume is **mirrored in depth** compared with
+the segmentation meshes (`mesh_z ≈ 5.735 − volume_z`, where z max is 5.747).
+In the Plotly view, the meshes are upright (vitreous up) and the B-scan volume
+is upside down, so the red cysts do not sit in the dark cystic spaces of the
+image. The exporter detects this by matching the tissue mesh's top surface
+against the inner retinal surface in the volume. It then corrects the volume:
+
+```
+volume/mesh depth check: median surface error same=1.164 mirrored=0.034 -> volume is MIRRORED in the source, correcting
+```
+
+After the correction the tissue shell runs exactly from the inner retinal
+surface to the RPE, and the cysts sit in the hyporeflective spaces. The fix
+belongs in the Python script: B-scan row 0 is the top of the image, so the
+depth used for the volume needs the same flip as the one used for the meshes.
+
+## 2. Unity (HDRP, `HLD-Templates/Unity/Hololuminescent`)
+
+1. Copy `unity/Assets/Hololuminescent/OCT/` into the project at the same path.
+2. Copy `out/W_I_OS/` to the PC (any folder).
+3. Unity menu **HLD ▸ Import OCT Export…**, then pick that folder. It creates
+   `Assets/Hololuminescent/Resources/Models/W_I_OS/`:
+   - `W_I_OS.prefab`: meshes, volume slices and controls
+   - HDRP Lit materials (fluids opaque, tissue transparent) and an HDRP Unlit
+     transparent slice material
+   - `*_volume.bytes` and `*_meta.json` TextAssets
+4. The importer adds `Models/W_I_OS/W_I_OS` to **Showcase ▸ ObjectSwitcher ▸
+   Resource Models** if `Character.unity` is open. Save the scene. If the field
+   has another name, add it there by hand.
+5. Press Play, or File ▸ Build and Run. Use ← / → to reach the scan.
+   GesturePlayer is added automatically, so auto-fit, hover, spin, drag/pinch
+   and depth sway all work as on the other models.
+
+**HLD ▸ Re-import last OCT Export** refreshes the assets after a new export,
+in place.
+
+### Keys (added; they don't clash with GesturePlayer / DisplayAlignment)
+
+| key | does |
+|---|---|
+| **V** | Volume mode: slice stack → single B-scan → off |
+| **, / .** | Previous / next B-scan (hold to scrub); switches to single-B-scan mode |
+| **T** | Tissue shell on/off (default off) |
+| **F** | Fluid meshes on/off |
+| **K / L** | Ink lighter / darker |
+| **I** | Info overlay (title, fluid volumes, legend) |
+
+## 3. Browser viewer
+
+```bash
+./serve.sh                      # Windows: serve.bat
+# open http://localhost:8000/viewer/
+```
+
+- It uses a 9:16 portrait stage and a 15° lens, like the HLD template camera.
+- The **alcove simulation** (M, on by default) multiplies the image over a
+  drawn box. On a normal monitor this shows what will vanish and what will
+  remain on the HLD.
+- On the HLD PC, open `…/viewer/?hld=1` in Chrome, move the window to the HLD
+  and press F11. This gives a pure white background with no simulation. It is
+  the quickest way to see the data on the real display without Unity.
+- Keys are the same as in Unity, plus ← → (switch scan), R (spin), D (depth
+  sway), [ ] (noise threshold), H (help), drag and wheel.
+- It runs offline: three.js r160 is bundled in `viewer/vendor/three/` (MIT
+  licence included).
+
+## Why it looks the way it does (HLD design decisions)
+
+- **The volume is drawn as ink.** On the HLD white is see-through and dark is
+  visible. The OCT image is bright tissue on black, which would turn into a
+  dark slab. Each slice is therefore a dark-ink texture whose alpha follows the
+  OCT signal: tissue becomes ink and the background vanishes into the real
+  alcove.
+- **There are three slice stacks.** The stack facing the camera most directly
+  is shown, so the volume never turns edge-on while it spins. Opacity is
+  corrected per stack for its slice spacing, so switching stacks doesn't change
+  the density.
+- **Saturated fluid meshes drawn after the ink** (IRF red, PED yellow, SRF
+  cyan). They look opaque and depth-test against each other, but the ink can't
+  cover them, so the fluid shows through the tissue like an X-ray. Saturated
+  colour gives the strongest contrast on a multiply display.
+- **The tissue shell is off by default.** Translucent grey over white shows as
+  a dull fog on the HLD, and the slices already show the tissue.
+- **The volume is cropped** to the depth range that has signal (62 → 33
+  layers). The alcove is a fixed box, so every empty millimetre makes the
+  retina smaller.
+- **Tone mapping is off** in the viewer; Unity already has it off. Otherwise
+  white renders grey.
+- **The overlay is dark text with no panel.** It floats on the front glass and
+  the alcove stays clean.
+
+## Status
+
+- ✅ **Exporter** tested on `W.I._OS.html`: 4 meshes and a 96×33×61 volume.
+  GLB structure is checked, and mesh/volume alignment is checked visually on a
+  B-scan.
+- ✅ **Browser viewer** tested in headless Chromium: it loads with no console
+  errors. Volume, single B-scan, tissue, help, HLD mode and alcove simulation
+  modes were all screenshotted and checked.
+- ✅ **Unity C#** compiles with C# 9 against stubs of the Unity APIs it uses,
+  in both input modes (new Input System and legacy). The importer's real GLB
+  reader and meta parser were run on this export. Parts, colours, counts and
+  index ranges match, and triangle winding stays consistent after the
+  glTF→Unity mirror.
+- ⚠ **Not yet run inside Unity.** The stub test can't check HDRP itself:
+  material keywords via `HDMaterial` (reflection, with property fallbacks),
+  transparent sort priority and slice sorting. If something looks wrong after
+  import, check the console for `[OCT]` lines.
+- ⚠ **Not seen on the real HLD yet:** ink colour and density (K/L to tune),
+  and overlay size.
+- The source figure carries patient initials in its title (`W.I./OS`), and
+  they end up in `meta.json` and the overlay. Keep `out/` local and don't
+  commit it to a public repo.
+- The figure itself says the segmentation is approximate and not validated. The
+  overlay repeats this.
+>>>>>>> 378bf9e (add readme)
 
 ## Layout
 
 ```
+<<<<<<< HEAD
 xrstream/
   geometry.py   parametric primitives, LOD by resolution, colours, part ids, surface point sampling
   font.py       single-stroke font for board writing
@@ -505,4 +672,17 @@ client/         three.js viewer: HUD, captions, animation player (incl. fire, bl
 lessons/        lesson plans (JSON) and how to write one
 tests/          132 tests
 results/        benchmark output: rooms, congested link, lessons
+=======
+exporter/plotly_to_hld.py     Plotly → GLB + raw volume + meta (stdlib only)
+exporter/example_hook.py      two-line hook for the generating script
+export.sh                     batch export into out/
+out/<scan>/                   exported scans (+ out/index.json for the viewer)
+unity/Assets/Hololuminescent/OCT/
+  OctScanMeta.cs              meta.json model
+  OctVolumeSlices.cs          ink slice stacks, auto axis, single-B-scan mode
+  OctScanControls.cs          keys + info overlay
+  Editor/OctImporter.cs       HLD ▸ Import OCT Export… (GLB reader, HDRP materials, prefab, ObjectSwitcher)
+viewer/                       three.js preview / HLD full-screen player (three.js vendored)
+docs/HOLOGRAM_CONTEXT.md      hardware + Unity project notes
+>>>>>>> 378bf9e (add readme)
 ```

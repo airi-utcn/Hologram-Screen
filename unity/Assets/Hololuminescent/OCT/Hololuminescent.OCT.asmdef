@@ -1,0 +1,12 @@
+{
+    "name": "Hololuminescent.OCT",
+    "rootNamespace": "Hololuminescent.Oct",
+    "references": [
+        "Unity.InputSystem"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "autoReferenced": true,
+    "noEngineReferences": false
+}

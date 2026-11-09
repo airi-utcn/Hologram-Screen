@@ -1,0 +1,14 @@
+{
+    "name": "Hololuminescent.OCT.Editor",
+    "rootNamespace": "Hololuminescent.Oct.EditorTools",
+    "references": [
+        "Hololuminescent.OCT"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "autoReferenced": false,
+    "noEngineReferences": false
+}
