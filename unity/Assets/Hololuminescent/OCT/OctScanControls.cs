@@ -9,7 +9,7 @@ namespace Hololuminescent.Oct
     /// <summary>
     /// Layer toggles + info overlay for an OCT scan prefab.
     /// Keys are chosen not to clash with GesturePlayer / DisplayAlignment:
-    ///   T tissue shell · F fluids · V volume mode (stack / single B-scan / off)
+    ///   T grey tissue shell · F fluids · V 3D mode (full / bright layers / slab / off)
     ///   , and .  previous / next B-scan · K / L ink lighter / darker · I info
     /// Only the active scan reacts (ObjectSwitcher disables the others).
     /// </summary>
@@ -147,12 +147,16 @@ namespace Hololuminescent.Oct
             var sb = new StringBuilder();
             if (volume)
             {
-                sb.Append(volume.mode == OctVolumeSlices.Mode.SingleBScan
-                    ? $"B-scan {volume.bscan + 1}/{volume.BScanCount}"
-                    : volume.mode == OctVolumeSlices.Mode.Volume ? "volume" : "volume off");
+                sb.Append(volume.mode switch
+                {
+                    OctVolumeSlices.Mode.Slab => $"3D slab at B-scan {volume.bscan + 1}/{volume.BScanCount}",
+                    OctVolumeSlices.Mode.Layers => "3D bright layers",
+                    OctVolumeSlices.Mode.Full => "3D retina",
+                    _ => "retina off"
+                });
                 sb.Append("  ·  ");
             }
-            sb.Append("T tissue · F fluids · V mode · , . B-scan · K L ink · I info");
+            sb.Append("V mode · , . slab · K L opacity · F fluids · T shell · I info");
             sb.Append("\nresearch visual — segmentation approximate, not validated");
             GUI.Label(new Rect(pad, y + fs * 0.4f, w, fs * 3f), sb.ToString(), _small);
         }

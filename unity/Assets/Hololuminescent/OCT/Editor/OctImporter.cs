@@ -251,7 +251,7 @@ namespace Hololuminescent.Oct.EditorTools
 
         static bool RegisterWithSwitcher(string resPath, string prefabPath)
         {
-            foreach (var mb in UnityEngine.Object.FindObjectsByType<MonoBehaviour>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+            foreach (var mb in UnityEngine.Object.FindObjectsByType<MonoBehaviour>(FindObjectsInactive.Include))
             {
                 if (mb == null || mb.GetType().Name != "ObjectSwitcher") continue;
                 var so = new SerializedObject(mb);

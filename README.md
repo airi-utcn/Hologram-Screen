@@ -571,11 +571,11 @@ in place.
 
 | key | does |
 |---|---|
-| **V** | Volume mode: slice stack → single B-scan → off |
-| **, / .** | Previous / next B-scan (hold to scrub); switches to single-B-scan mode |
-| **T** | Tissue shell on/off (default off) |
+| **V** | 3D mode: full retina (default) → bright layers only → 3D slab around one B-scan → off |
+| **, / .** | Move the 3D slab to the previous / next B-scan (hold to scrub) |
+| **T** | Grey segmentation shell on/off (default off) |
 | **F** | Fluid meshes on/off |
-| **K / L** | Ink lighter / darker |
+| **K / L** | Retina surfaces more see-through / more solid |
 | **I** | Info overlay (title, fluid volumes, legend) |
 
 ## 3. Browser viewer
