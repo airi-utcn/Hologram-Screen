@@ -167,16 +167,289 @@ MonoBehaviour:
   autoCycle: 0
   repeatsPerGesture: 2
   speed: 0.6
-  fitHeight: 3
+  fitHeight: 3.5
+  maxWidth: 3.2
+  heightOffset: 1
+  defaultDepth: -1.5
+  depthSpeed: 1.5
+  startPitch: 15
+  startYaw: 30
   spin: 1
   spinSpeed: 30
---- !u!114 &57585954
+  keyTurnSpeed: 60
+  heartbeat: 0
+  minHeight: 0.5
+--- !u!1001 &700000001
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: -8679921383154817045, guid: fefd5a52215a9a347b67207a157ec4b0, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: fefd5a52215a9a347b67207a157ec4b0, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0.9
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: fefd5a52215a9a347b67207a157ec4b0, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: -3.81
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: fefd5a52215a9a347b67207a157ec4b0, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: -0.094330005
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: fefd5a52215a9a347b67207a157ec4b0, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: fefd5a52215a9a347b67207a157ec4b0, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: -0.99554104
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: fefd5a52215a9a347b67207a157ec4b0, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: fefd5a52215a9a347b67207a157ec4b0, type: 3}
+      propertyPath: m_Name
+      value: Man
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: fefd5a52215a9a347b67207a157ec4b0, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 700000003}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: fefd5a52215a9a347b67207a157ec4b0, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 700000004}
+  m_SourcePrefab: {fileID: 100100000, guid: fefd5a52215a9a347b67207a157ec4b0, type: 3}
+--- !u!1 &700000002 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: fefd5a52215a9a347b67207a157ec4b0, type: 3}
+  m_PrefabInstance: {fileID: 700000001}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &700000003
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 57585950}
+  m_GameObject: {fileID: 700000002}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7dbee48bdd4d49ffb03b859b69cf5acc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GesturePlayer
+  gestures:
+  - {fileID: -203655887218126122, guid: fefd5a52215a9a347b67207a157ec4b0, type: 3}
+  autoCycle: 0
+  repeatsPerGesture: 2
+  speed: 0.6
+  fitHeight: 3.5
+  maxWidth: 3.2
+  heightOffset: 1
+  defaultDepth: -1.5
+  depthSpeed: 1.5
+  startPitch: 15
+  startYaw: 30
+  spin: 1
+  spinSpeed: 30
+  keyTurnSpeed: 60
+  heartbeat: 0
+  minHeight: 0.5
+--- !u!95 &700000004
+Animator:
+  serializedVersion: 7
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 700000002}
+  m_Enabled: 1
+  m_Avatar: {fileID: 0}
+  m_Controller: {fileID: 0}
+  m_CullingMode: 0
+  m_UpdateMode: 0
+  m_ApplyRootMotion: 0
+  m_LinearVelocityBlending: 0
+  m_StabilizeFeet: 0
+  m_AnimatePhysics: 0
+  m_WarningMessage: 
+  m_HasTransformHierarchy: 1
+  m_AllowConstantClipSamplingOptimization: 1
+  m_KeepAnimatorStateOnDisable: 0
+  m_WriteDefaultValuesOnDisable: 0
+--- !u!1001 &710000001
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: -8679921383154817045, guid: 36f8c2dd82cf9a44392e52535ed680f7, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 36f8c2dd82cf9a44392e52535ed680f7, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0.9
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 36f8c2dd82cf9a44392e52535ed680f7, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: -3.81
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 36f8c2dd82cf9a44392e52535ed680f7, type: 3}
+      propertyPath: m_Name
+      value: Engine
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 36f8c2dd82cf9a44392e52535ed680f7, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 710000003}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 36f8c2dd82cf9a44392e52535ed680f7, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 710000004}
+  m_SourcePrefab: {fileID: 100100000, guid: 36f8c2dd82cf9a44392e52535ed680f7, type: 3}
+--- !u!1 &710000002 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: 36f8c2dd82cf9a44392e52535ed680f7, type: 3}
+  m_PrefabInstance: {fileID: 710000001}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &710000003
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 710000002}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7dbee48bdd4d49ffb03b859b69cf5acc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GesturePlayer
+  gestures:
+  - {fileID: 7316029515446210701, guid: 36f8c2dd82cf9a44392e52535ed680f7, type: 3}
+  - {fileID: 7316029515446210702, guid: 36f8c2dd82cf9a44392e52535ed680f7, type: 3}
+  autoCycle: 0
+  repeatsPerGesture: 2
+  speed: 0.6
+  fitHeight: 3.5
+  maxWidth: 3.2
+  heightOffset: 1
+  defaultDepth: -1.5
+  depthSpeed: 1.5
+  startPitch: 15
+  startYaw: 30
+  spin: 1
+  spinSpeed: 30
+  keyTurnSpeed: 60
+  heartbeat: 0
+  minHeight: 0.5
+--- !u!95 &710000004
+Animator:
+  serializedVersion: 7
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 710000002}
+  m_Enabled: 1
+  m_Avatar: {fileID: 0}
+  m_Controller: {fileID: 0}
+  m_CullingMode: 0
+  m_UpdateMode: 0
+  m_ApplyRootMotion: 0
+  m_LinearVelocityBlending: 0
+  m_StabilizeFeet: 0
+  m_AnimatePhysics: 0
+  m_WarningMessage: 
+  m_HasTransformHierarchy: 1
+  m_AllowConstantClipSamplingOptimization: 1
+  m_KeepAnimatorStateOnDisable: 0
+  m_WriteDefaultValuesOnDisable: 0
+--- !u!1 &720000001
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 720000002}
+  - component: {fileID: 720000003}
+  - component: {fileID: 720000004}
+  m_Layer: 0
+  m_Name: Showcase
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &720000002
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 720000001}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &720000003
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 720000001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 49c7b1e8c17a4476b95eebde5f91f698, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ObjectSwitcher
+  objects:
+  - {fileID: 57585950}
+  - {fileID: 700000002}
+  - {fileID: 710000002}
+  resourceModels:
+  - Models/Stallion/Stallion
+  - Models/Globe/Atlas
+  - Models/Tesseract/Tesseract
+  - Models/PlanetSystem/PlanetSystem
+  - Models/HumanHeart/HumanHeart
+  - Models/W_I_OS/W_I_OS
+  - Models/AIRI/AIRI
+  resourceFitHeight: 3.5
+  heartbeatModels:
+  - Models/HumanHeart/HumanHeart
+  heartbeatBpm: 60
+  stillModels:
+  - Models/AIRI/AIRI
+  stillModelsAxis: 2
+  firstModel: Models/AIRI/AIRI
+--- !u!114 &720000004
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 720000001}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: a7f0aa5eaef34b798812d23fe1defc9c, type: 3}
@@ -185,6 +458,10 @@ MonoBehaviour:
   moveStep: 0.05
   zoomStep: 0.25
   showHelpOnStart: 1
+  sway: 1
+  swayAngle: 3
+  swayPeriod: 9
+  defaultPerspective: 1
 --- !u!1 &824042351
 GameObject:
   m_ObjectHideFlags: 0
@@ -388,9 +665,6 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 3542d2b612f94bc9b469915a8a2f27b7, type: 3}
       insertIndex: -1
       addedObject: {fileID: 57585953}
-    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 3542d2b612f94bc9b469915a8a2f27b7, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 57585954}
   m_SourcePrefab: {fileID: 100100000, guid: 3542d2b612f94bc9b469915a8a2f27b7, type: 3}
 --- !u!1 &2013410473
 GameObject:
@@ -449,3 +723,6 @@ SceneRoots:
   - {fileID: 1674048588}
   - {fileID: 824042353}
   - {fileID: 1213898094}
+  - {fileID: 700000001}
+  - {fileID: 710000001}
+  - {fileID: 720000002}

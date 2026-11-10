@@ -56,6 +56,7 @@ Press **H** in the app to show them on screen.
 | Q / E | turn |
 | W / S | push back / pull forward in depth (saved) |
 | R | auto-spin on / off |
+| A | spin axis: Y (upright turntable) → X (tumbles toward you) → Z (wheel facing you) |
 | 1–9 | play animation 1–9 (it loops) |
 | Space | pause / play the animation |
 | − / + / Backspace | slower / faster / normal speed |
@@ -126,7 +127,9 @@ Easy shortcut: copy a material from another model's folder (for example `Robot/r
 2. On **Object Switcher**, add a line to **Resource Models** with the path inside `Resources`, **without the file extension**:
    `Models/<Name>/<file name>`, for example `Models/Stallion/Stallion`.
 3. Optional: add the same path to **Heartbeat Models** for a beating pulse.
-4. Save the scene (**Ctrl + S**).
+4. Optional: add it to **Still Models** to have it start standing still; **R** then spins it around **Still Models Axis** (now Z, used for the AIRI logo).
+5. Optional: put the path in **First Model** to show it when the app starts (now: `Models/AIRI/AIRI`, the AIRI logo).
+6. Save the scene (**Ctrl + S**).
 
 The app scales every model to the same height (**Resource Fit Height**, 3.5), so its original size doesn't matter, and it faces the camera at a three-quarter angle.
 

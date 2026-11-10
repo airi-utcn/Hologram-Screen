@@ -1,0 +1,89 @@
+{
+  "name": "W_I_OS",
+  "title": "OCT volume + MIRAGE fluid segmentation — W.I./OS  (61 B-scans)",
+  "subtitle": "original B-scans=grayscale planes · tissue=translucent gray · Cyst/IRF=red · PED=yellow · SRF=cyan · spacings approx (not from metadata) · depth x3 (NOT to scale)",
+  "notes": [
+    "Fluid volume (dx=11.46 dz=3.87 dy=122 µm)\n■ Cyst / IRF: 0.2757 µL (50,947 vox)\n■ PED: 0.0023 µL (417 vox)\n■ SRF: 0.0105 µL (1,943 vox)\nTOTAL IRF+SRF: 0.2862 µL\napprox — domain-shift, not validated"
+  ],
+  "units": "mm",
+  "axes": {
+    "X": "lateral",
+    "Y": "up",
+    "Z": "B-scan direction",
+    "source": {
+      "xaxis": "lateral (mm)",
+      "yaxis": "B-scan / en-face (mm)",
+      "zaxis": "depth (mm x3, not to scale)"
+    },
+    "depthScale": 1.0,
+    "flipDepth": false
+  },
+  "size": [
+    8.78982,
+    3.14994,
+    7.32
+  ],
+  "layers": [
+    {
+      "name": "retinal tissue",
+      "label": "retinal tissue",
+      "kind": "tissue",
+      "color": "#d3d3d3",
+      "opacity": 0.18,
+      "vertices": 23348,
+      "triangles": 45228
+    },
+    {
+      "name": "Cyst / IRF",
+      "label": "Cyst / IRF (50947 vox)",
+      "kind": "fluid",
+      "color": "#e6194b",
+      "opacity": 1.0,
+      "vertices": 2660,
+      "triangles": 5250
+    },
+    {
+      "name": "PED",
+      "label": "PED (417 vox)",
+      "kind": "fluid",
+      "color": "#ffe119",
+      "opacity": 1.0,
+      "vertices": 10,
+      "triangles": 10
+    },
+    {
+      "name": "SRF",
+      "label": "SRF (1943 vox)",
+      "kind": "fluid",
+      "color": "#00d5d5",
+      "opacity": 1.0,
+      "vertices": 132,
+      "triangles": 260
+    }
+  ],
+  "volume": {
+    "file": "volume.u8",
+    "format": "uint8",
+    "order": "x-fastest, then y, then z",
+    "dims": [
+      96,
+      33,
+      61
+    ],
+    "spacing": [
+      0.092524,
+      0.094212,
+      0.122
+    ],
+    "origin": [
+      -4.39491,
+      0.0,
+      -3.66
+    ],
+    "threshold": 0.12,
+    "sourceOpacity": 0.12,
+    "mirroredInSource": true,
+    "name": "OCT volume"
+  },
+  "model": "model.glb"
+}

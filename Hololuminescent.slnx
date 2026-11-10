@@ -1,4 +1,6 @@
 ﻿<Solution>
+  <Project Path="Hololuminescent.OCT.csproj" />
+  <Project Path="Hololuminescent.OCT.Editor.csproj" />
   <Project Path="Assembly-CSharp.csproj" />
   <Project Path="Assembly-CSharp-Editor.csproj" />
   <Project Path="HololuminescentEditor.csproj" />
