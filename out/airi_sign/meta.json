@@ -1,0 +1,7 @@
+{
+  "name": "airi_sign",
+  "kind": "model",
+  "title": "AIRi sign",
+  "subtitle": "3D model of the AIRi logo mark · same mesh as the Unity project (AIRI.fbx)",
+  "model": "model.glb"
+}

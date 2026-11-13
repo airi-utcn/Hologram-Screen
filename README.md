@@ -74,6 +74,10 @@ Blank margin is measured away before a logo is placed. The AIRi file uses 39% of
 artwork instead. A logo with a solid white background will hang as a white rectangle on a wall, so the files here
 are the background-free ones; the originals are kept in `logo/`.
 
+The UTCN logo is the exception to "copy it across": the official file is dark ink, which disappears on a dark wall,
+so `client/logos/3-utcn.svg` is `logo/utcn-logo-color.svg` with the dark ink turned white and the red kept. As the
+third file it hangs on the left, outside the AIRi one.
+
 Logos are sized to what they hang on. Beside a board the board sets the scale; on a plain wall they scale with the
 wall, because a sports hall is seen from three times as far away as a classroom. In a room with no board they hang
 on the end wall, either side of the middle.
@@ -594,6 +598,14 @@ in place.
   the quickest way to see the data on the real display without Unity.
 - Keys are the same as in Unity, plus ← → (switch scan), R (spin), D (depth
   sway), [ ] (noise threshold), H (help), drag and wheel.
+- Besides scans it shows plain 3D models: the **AIRi sign** (`out/airi_sign/`)
+  and the **UTCN sigla** (`out/utcn_sigla/`) are in the list, reached with
+  ← → or directly with `…/viewer/?scan=utcn_sigla`. To add another, make a
+  folder in `out/` holding `model.glb` and a `meta.json` with
+  `"kind": "model"`, a `name` and a `title`, and add the folder name to
+  `out/index.json`. The model keeps its own colours and is scaled and centred
+  on load. A model that exists only as FBX is converted with
+  `python3 exporter/fbx_to_glb.py in.fbx out/<name>/model.glb`.
 - It runs offline: three.js r160 is bundled in `viewer/vendor/three/` (MIT
   licence included).
 

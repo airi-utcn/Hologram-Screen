@@ -1,5 +1,7 @@
 {
  "scans": [
-  "W_I_OS"
+  "W_I_OS",
+  "airi_sign",
+  "utcn_sigla"
  ]
 }

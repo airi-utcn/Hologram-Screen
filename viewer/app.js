@@ -83,7 +83,16 @@ async function loadScan(name) {
   root.add(spinner); spinner.add(content);
 
   const tissue = [], fluids = [];
-  if (meta.model) {
+  if (meta.kind === "model") {
+    // a plain 3D model (a logo, a sign): keep its own materials, and measure
+    // it here, since it comes in any unit and with its origin anywhere
+    const gltf = await new GLTFLoader().loadAsync(`${base}/${meta.model}`);
+    const box = new THREE.Box3().setFromObject(gltf.scene);
+    const mid = box.getCenter(new THREE.Vector3());
+    gltf.scene.position.set(-mid.x, -box.min.y, -mid.z);   // centred, standing on y = 0
+    meta.size = box.getSize(new THREE.Vector3()).toArray();
+    content.add(gltf.scene);
+  } else if (meta.model) {
     const gltf = await new GLTFLoader().loadAsync(`${base}/${meta.model}`);
     gltf.scene.traverse((o) => {
       if (!o.isMesh) return;
@@ -287,6 +296,10 @@ function fineprint(m) {
 
 function renderInfo() {
   const m = current.meta;
+  if (m.kind === "model") {
+    $("info").innerHTML = `<h1>${esc(m.title || m.name)}</h1><div class="fine">${esc(m.subtitle)}</div>`;
+    return;
+  }
   const notes = (m.notes || []).join("\n");
   const amount = (layer) => {
     const line = notes.split("\n").find((l) => l.includes(layer + ":")) || "";
@@ -310,7 +323,8 @@ function setStatus(text) {
   if (text) { $("status").textContent = text; return; }
   if (!current) return;
   const v = current.meta.volume;
-  const mode = state.mode === "bscan" ? `B-scan ${state.bscan + 1} / ${v?.dims[2]}`
+  const mode = !v ? "model"
+             : state.mode === "bscan" ? `B-scan ${state.bscan + 1} / ${v.dims[2]}`
              : state.mode === "volume" ? "volume" : "volume off";
   $("status").textContent = `${current.name}  ·  ${mode}  ·  ${state.index + 1}/${state.scans.length}  ·  H for keys`;
 }
