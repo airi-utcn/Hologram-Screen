@@ -66,6 +66,8 @@ ExportedObj/
 sysinfo.txt
 
 # Builds
+# Unity player builds (File > Build): hundreds of MB, rebuilt from the project anyway
+/[Bb]uild_*/
 *.apk
 *.aab
 *.unitypackage
