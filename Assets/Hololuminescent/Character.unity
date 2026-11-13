@@ -436,6 +436,7 @@ MonoBehaviour:
   - Models/W_I_OS/W_I_OS
   - Models/AIRI/AIRI
   - Models/AIRI_Intro/AIRI_Intro
+  - Models/UTCN/UTCN
   - Models/Shoe/Chemi-AU-O005
   - Models/Parchetto/Chemi-IT-B001
   resourceFitHeight: 3.5
@@ -447,6 +448,8 @@ MonoBehaviour:
   stillModelsAxis: 2
   uprightModels:
   - Models/AIRI_Intro/AIRI_Intro
+  - Models/UTCN/UTCN
+  uprightModelsShiftX: -0.02
   firstModel: Models/AIRI_Intro/AIRI_Intro
 --- !u!114 &720000004
 MonoBehaviour:

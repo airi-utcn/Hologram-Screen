@@ -56,6 +56,10 @@ Press **H** in the app to show them on screen.
 | ↑ / ↓ | tilt |
 | Q / E | turn |
 | W / S | push back / pull forward in depth (saved) |
+| Ctrl + ← / → / ↑ / ↓ | move the object left / right / up / down |
+| F5 | save this object's look to `object_configs.json` (see below) |
+| F8 | forget this object's saved look (defaults again at next start) |
+| Alt + any key above | steps ten times smaller (move, turn, depth, wheel size, speed, sway, perspective, alignment) |
 | R | auto-spin on / off |
 | A | spin axis: Y (upright turntable) → X (tumbles toward you) → Z (wheel facing you) |
 | 1–9 | play animation 1–9 (it loops) |
@@ -68,6 +72,32 @@ Press **H** in the app to show them on screen.
 | Shift + PgUp / PgDn | zoom (saved) |
 | Shift + Backspace | reset the view alignment |
 | Ctrl + E | monitor menu |
+
+## Saving each object's look
+
+Every model gets a size, place and angle automatically. To fix one by hand:
+1. Show it (← / →). Stop the spin with **R** if you want a fixed angle.
+2. Set it up: **Ctrl + arrows** to move it, **W / S** for depth, pinch / wheel for size, drag or **↑ ↓ Q E** for the angle, **A** for the spin axis, **1–9** for the animation it should start with, **− / +** for its speed, **Space** to stop it on an exact frame, **D**, **[ ]** and **O / P** for its view. Hold **Alt** for fine steps.
+   The **H** box shows the object's exact values live (position, lift, angle, size, spin, animation, frame, view).
+3. Press **F5**. The app saves that object and shows where.
+
+At the next start, that object comes up exactly like that instead of the automatic defaults. **F8** forgets it.
+
+Everything goes into **`Assets/StreamingAssets/object_configs.json`**, one entry per object, keyed by its name (in a build: `<App>_Data/StreamingAssets/object_configs.json`). Commit it to share the setup. You can also edit it by hand while the app is closed:
+
+| Field | Meaning |
+|---|---|
+| `name` | object name (the model's file name; the shoe + temple is `Chemi-AU-O005 + Chemi-IT-B001`) |
+| `position` | where it stands (world units). `y` is only for reference, the height comes from `lift` |
+| `lift` | height above the default hover height (Ctrl + ↑ / ↓) |
+| `rotation` | angle in degrees (x = tilt, y = turn, z = roll) |
+| `scale` | size |
+| `spin`, `spinAxis`, `spinSpeed` | turntable on / off, `Y` / `X` / `Z`, degrees per second |
+| `animation`, `animationSpeed` | animation it starts with (1–9, 0 = none) and its speed (1 = normal, steps of 0.01) |
+| `paused`, `animationTime` | stopped with Space, on this frame (seconds into the animation) |
+| `sway`, `swayAngle`, `perspective` | the view while this object shows (D, [ ], O / P). `perspective` 0 = use the shared view |
+
+The display alignment (**Shift** + ↑ ↓ / PgUp PgDn) is not saved per object: it lines the image up with the physical alcove, so it stays one setting for all. A saved object keeps its own depth; **W / S** on it no longer changes the shared depth of the others. If the file can't be read (for example a typo after editing it by hand), the app ignores it, says so in the Console and doesn't overwrite it.
 
 ## Project layout
 
@@ -130,8 +160,13 @@ Easy shortcut: copy a material from another model's folder (for example `Robot/r
    `Models/<Name>/<file name>`, for example `Models/Stallion/Stallion`.
 3. Optional: add the same path to **Heartbeat Models** for a beating pulse.
 4. Optional: add it to **Still Models** to have it start standing still; **R** then spins it around **Still Models Axis** (now Z, used for the AIRI logo).
-5. Optional: put the path in **First Model** to show it when the app starts (now: `Models/AIRI/AIRI`, the AIRI logo).
-6. Save the scene (**Ctrl + S**).
+5. Optional: add it to **Upright Models** for logos and text. It starts straight, facing the viewer (no three-quarter turn or tilt), and only ever turns around Y. Tilting and **A** are ignored for it. Used for `Models/AIRI_Intro/AIRI_Intro` and `Models/UTCN/UTCN`. **Upright Models Shift X** nudges them all sideways after centring (now -0.02); for one of them only, move it with Ctrl + arrows and save with F5.
+   **AIRI ↔ UTCN:** the two logos show as one object that swaps between them in a loop: each floats and sways evenly left and right of facing you (±12°) for 5 s, then whips round, shrinks and flies off into the depth while the other comes out of the depth, spins down and settles. Timings (hold, swap, sway, depth, turns) are on the **Logo Duet** component of the `AIRI_Intro + UTCN` object; the pair is set under **AIRI <-> UTCN** on Object Switcher. Clear **Duet First** to show the logos separately again. The logos keep their shape from the files; their depth comes from a **logo light** in front of and above them, which casts each logo's whole outline onto the floor behind it (the alcove's own lights meet a flat upright logo edge-on, so their shadow is only a line). While the logos show it is the main light and the alcove's overhead spot is dimmed to 25% (**Alcove Spot While Shown**), because the floor is lit past white and a shadow only shows where the remaining light falls below white. Other objects get the normal lighting back. Its position and strength are on **Logo Duet** (Light Up, Light Toward, Light Strength). The alcove lights' shadows are 2048 px for sharp floor shadows. The logos stand upright and centred, and the sway swings them evenly to both sides of facing you, so their sides show (**Sway** 12°, **Rest Yaw** 0, **Rest Pitch** 0).
+
+   **UTCN logo source:** built by `blender/utcn_sigla.py` (branch `oct_hologram`) from the official SVG. The copy in `SourceModels/UTCN/` uses 24 curve points for the small line and 16 for the big text (was 4 and 6, which made C and O look like polygons). To rebuild it: `blender -b --factory-startup -P blender/utcn_sigla.py` on that branch, with those two numbers changed, then copy `utcn_sigla.fbx` over `Resources/Models/UTCN/UTCN.fbx`.
+   **Shoe, then building:** the shoe (`Shoe`) and the temple (`Parchetto`) show as one object, as in the CGIS colleague's scene. The shoe turns twice alone, then the temple grows in behind it, with the shoe standing enlarged on the temple's base in front of the entrance columns, and then the set turns. Settings are under **Shoe, then building** on Object Switcher (spot, size, turn of the shoe). Clear **Reveal Front** to show them separately again.
+6. Optional: put the path in **First Model** to show it when the app starts (now: `Models/AIRI_Intro/AIRI_Intro`, the AIRI intro logo).
+7. Save the scene (**Ctrl + S**).
 
 The app scales every model to the same height (**Resource Fit Height**, 3.5), so its original size doesn't matter, and it faces the camera at a three-quarter angle.
 
@@ -140,6 +175,7 @@ Press **Play** and use **→** until it shows.
 - **Too big or touching the ceiling:** lower **Resource Fit Height**. It should stay inside the light-blue Boundary Helper box.
 - **Too wide (crosses the alcove's sides):** lower **Max Width** on GesturePlayer.
 - **Textures in the wrong place or blurry (glb):** the model may use a UV set above 1, which glTFast can't read. It needs converting so its textures use UV set 0.
+- **Lying flat on the floor:** it was modelled lying down in Blender. Stand it up there (rotate 90° on X, **Ctrl + A → Rotation**) and export again. For `AIRI_Intro.fbx`, the root's -90° X turn in the file was set to 0 instead, which stands it up facing the viewer.
 - **Nothing shows:** the Console says `ObjectSwitcher: nothing at Resources/...` when the path is wrong. Check the spelling and that the file is inside `Resources`.
 
 ### 7. Commit it

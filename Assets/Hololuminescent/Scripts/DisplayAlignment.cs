@@ -32,6 +32,10 @@ public class DisplayAlignment : MonoBehaviour
     // v2: earlier builds saved a 2x default that bent the view away from the physical alcove's lines.
     private const string PerspectiveKey = "HLD_Perspective_v2";
     private float perspective;
+    // The shared view; an object saved with F5 may bring its own while it shows (UseView).
+    private bool globalSway;
+    private float globalSwayAngle, globalPerspective;
+    private bool overridden;
 
     private Camera cam;
     private Vector3 basePosition;
@@ -58,14 +62,39 @@ public class DisplayAlignment : MonoBehaviour
         "A            spin axis  (Y / X / Z)\n" +
         "Up / Down    tilt object\n" +
         "Q / E        turn object\n" +
-        "W / S        push back / pull forward\n\n" +
+        "W / S        push back / pull forward\n" +
+        "Ctrl+arrows  move left / right / up / down\n" +
+        "F5           save this object (place, size, angle,\n" +
+        "             spin, animation)      F8  forget it\n\n" +
         "D            depth sway on / off\n" +
         "[  /  ]      weaker / stronger sway\n" +
         "O  /  P      less / more perspective\n\n" +
         "Shift + Up / Down         move scene up / down\n" +
         "Shift + PageUp / PageDn   zoom in / out\n" +
         "Shift + Backspace         reset alignment\n\n" +
+        "Alt + any of the above   10x finer steps\n" +
         "Ctrl + E     choose display";
+
+    // Awake, so objects can hand over their saved view in their Start.
+    private void Awake()
+    {
+        perspective = globalPerspective = PlayerPrefs.GetFloat(PerspectiveKey, defaultPerspective);
+        globalSway = sway;
+        globalSwayAngle = swayAngle;
+    }
+
+    public void GetView(out bool swayOn, out float angle, out float lensWidening)
+    {
+        swayOn = sway; angle = swayAngle; lensWidening = perspective;
+    }
+
+    public void UseView(ObjectConfig c)
+    {
+        overridden = c != null && c.perspective > 0f;
+        sway = overridden ? c.sway : globalSway;
+        swayAngle = overridden ? c.swayAngle : globalSwayAngle;
+        perspective = overridden ? c.perspective : globalPerspective;
+    }
 
     private void Start()
     {
@@ -85,7 +114,6 @@ public class DisplayAlignment : MonoBehaviour
         pivotDistance = target != null ? Vector3.Dot(target.transform.position - basePosition, cam.transform.forward) : 20f;
         offsetY = PlayerPrefs.GetFloat(OffsetKey, 0f);
         fovDelta = PlayerPrefs.GetFloat(ZoomKey, 0f);
-        perspective = PlayerPrefs.GetFloat(PerspectiveKey, defaultPerspective);
         showHelp = showHelpOnStart;
     }
 
@@ -96,18 +124,29 @@ public class DisplayAlignment : MonoBehaviour
 
         if (keyboard.hKey.wasPressedThisFrame)
             showHelp = !showHelp;
+        bool fine = keyboard.altKey.isPressed; // Alt: steps ten times smaller
         if (keyboard.dKey.wasPressedThisFrame)
+        {
             sway = !sway;
+            if (!overridden) globalSway = sway;
+        }
         if (keyboard.leftBracketKey.wasPressedThisFrame || keyboard.rightBracketKey.wasPressedThisFrame)
         {
-            swayAngle = Mathf.Clamp(swayAngle + (keyboard.rightBracketKey.wasPressedThisFrame ? 0.5f : -0.5f), 0f, 10f);
-            Show($"Sway {swayAngle:0.0} degrees");
+            float step = fine ? 0.05f : 0.5f;
+            swayAngle = Mathf.Clamp(swayAngle + (keyboard.rightBracketKey.wasPressedThisFrame ? step : -step), 0f, 10f);
+            if (!overridden) globalSwayAngle = swayAngle;
+            Show($"Sway {swayAngle:0.00} degrees");
         }
         if (keyboard.oKey.wasPressedThisFrame || keyboard.pKey.wasPressedThisFrame)
         {
-            perspective = Mathf.Clamp(perspective * (keyboard.pKey.wasPressedThisFrame ? 1.25f : 0.8f), 1f, 4f);
-            PlayerPrefs.SetFloat(PerspectiveKey, perspective);
-            PlayerPrefs.Save();
+            float factor = fine ? 1.025f : 1.25f;
+            perspective = Mathf.Clamp(perspective * (keyboard.pKey.wasPressedThisFrame ? factor : 1f / factor), 1f, 4f);
+            if (!overridden)
+            {
+                globalPerspective = perspective;
+                PlayerPrefs.SetFloat(PerspectiveKey, perspective);
+                PlayerPrefs.Save();
+            }
             Show($"Perspective {perspective:0.00}x   (lens {Mathf.Clamp(Mathf.Clamp(baseFov + fovDelta, 1f, 60f) * perspective, 1f, 75f):0} degrees)");
         }
 
@@ -115,10 +154,11 @@ public class DisplayAlignment : MonoBehaviour
 
         bool changed = true;
         // Moving the camera down makes the scene appear to move up.
-        if (keyboard.upArrowKey.wasPressedThisFrame) offsetY -= moveStep;
-        else if (keyboard.downArrowKey.wasPressedThisFrame) offsetY += moveStep;
-        else if (keyboard.pageUpKey.wasPressedThisFrame) fovDelta -= zoomStep;
-        else if (keyboard.pageDownKey.wasPressedThisFrame) fovDelta += zoomStep;
+        float move = fine ? moveStep * 0.1f : moveStep, zoom = fine ? zoomStep * 0.1f : zoomStep;
+        if (keyboard.upArrowKey.wasPressedThisFrame) offsetY -= move;
+        else if (keyboard.downArrowKey.wasPressedThisFrame) offsetY += move;
+        else if (keyboard.pageUpKey.wasPressedThisFrame) fovDelta -= zoom;
+        else if (keyboard.pageDownKey.wasPressedThisFrame) fovDelta += zoom;
         else if (keyboard.backspaceKey.wasPressedThisFrame) { offsetY = 0f; fovDelta = 0f; }
         else changed = false;
 
@@ -178,7 +218,9 @@ public class DisplayAlignment : MonoBehaviour
 
         // Tells on the display itself whether Windows reported a touch screen to the app (if not, it's a cable / driver issue).
         string touch = Touchscreen.current != null ? "\n\nTouch screen: found" : "\n\nTouch screen: NOT found (check the USB cable)";
-        string text = showHelp ? Help + touch : message;
+        var shown = showHelp ? FindAnyObjectByType<GesturePlayer>() : null; // only the shown object is active
+        string view = $"\nview: sway {(sway ? "on" : "off")} {swayAngle:0.00}   perspective {perspective:0.000}{(overridden ? "  (saved with object)" : "")}";
+        string text = showHelp ? Help + touch + (shown != null ? "\n\n" + shown.Describe() + view : "") : message;
         if (showHelp && Time.time <= messageUntil)
             text += "\n\n" + message;
 

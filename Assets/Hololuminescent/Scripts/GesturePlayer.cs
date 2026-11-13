@@ -43,6 +43,8 @@ public class GesturePlayer : MonoBehaviour
     [SerializeField] private float startYaw = 30f;
     [Tooltip("Starts straight, facing the viewer (no start turn or tilt), and only ever turns around Y: no tilting, A is ignored. For logos and text.")]
     [SerializeField] private bool uprightOnly = false;
+    [Tooltip("Upright Only models are centred sideways on their spot; this then nudges them (world units, negative = left).")]
+    [SerializeField] private float shiftX = 0f;
 
     [Header("Turntable")]
     [SerializeField] private bool spin = true;
@@ -53,6 +55,8 @@ public class GesturePlayer : MonoBehaviour
 
     [Tooltip("Degrees per second while Up/Down (tilt) or Q/E (turn) are held.")]
     [SerializeField] private float keyTurnSpeed = 60f;
+    [Tooltip("World units per second while Ctrl + arrows (move left / right / up / down) are held.")]
+    [SerializeField] private float moveSpeed = 0.5f;
 
     [Header("Heartbeat")]
     [Tooltip("Beats per minute of a code-driven lub-dub pulse, for models with no animation of their own. 0 = off. Space pauses it, -/+ change its speed.")]
@@ -76,6 +80,9 @@ public class GesturePlayer : MonoBehaviour
     private bool started;
     private float baseZ;
     private float depth;
+    private float lift;      // Ctrl + Up / Down: height above the default hover
+    private bool hasConfig;  // saved with F5: own depth instead of the shared W/S one
+    private ObjectConfig saved;
     // Spin frame, in the model's own space: the direction that was "up" when it was placed, and its middle.
     // Model files differ in how their insides are turned, so the model's own Y axis can't be trusted to be vertical.
     private Vector3 uprightLocal = Vector3.up;
@@ -88,11 +95,15 @@ public class GesturePlayer : MonoBehaviour
     public bool Spin { set => spin = value; }
     public SpinAxis Axis { set => spinAxis = value; }
     public bool UprightOnly { set => uprightOnly = value; }
+    public float ShiftX { set => shiftX = value; }
 
     public enum SpinAxis { Y, X, Z }
 
     private float beatPhase;
     private float beatFactor = 1f;
+
+    // Hold Alt for steps ten times smaller (move, turn, depth, wheel size, animation speed).
+    private static bool Fine => Keyboard.current != null && Keyboard.current.altKey.isPressed;
 
     private int ClipCount => legacyClips != null ? legacyClips.Length : gestures != null ? gestures.Length : 0;
     private bool Animated => ClipCount > 0 || heartbeat > 0f;
@@ -101,6 +112,7 @@ public class GesturePlayer : MonoBehaviour
     {
         renderers = GetComponentsInChildren<Renderer>();
         floorY = transform.position.y;
+        float spotX = transform.position.x;
         baseZ = transform.position.z;
         depth = PlayerPrefs.GetFloat(DepthKey, defaultDepth);
         transform.position = new Vector3(transform.position.x, transform.position.y, baseZ + depth);
@@ -114,6 +126,9 @@ public class GesturePlayer : MonoBehaviour
             Fit(fitHeight, true);
         else if (renderers.Length > 0)
             height = GetBounds(renderers).size.y;
+        // A logo's pivot is rarely its middle; centre what is actually drawn on the spot.
+        if (uprightOnly && renderers.Length > 0)
+            transform.position += Vector3.right * (spotX + shiftX - GetBounds(renderers).center.x);
         uprightLocal = transform.InverseTransformDirection(Vector3.up);
         if (renderers.Length > 0)
             centerLocal = transform.InverseTransformPoint(GetBounds(renderers).center);
@@ -133,8 +148,98 @@ public class GesturePlayer : MonoBehaviour
             }
         }
 
+        var config = ObjectConfigs.Get(gameObject.name);
+        if (config != null)
+            ApplyConfig(config);
+
         if (ClipCount > 0)
-            Play(0);
+        {
+            Play(config != null && config.animation >= 1 && config.animation <= ClipCount ? config.animation - 1 : 0);
+            if (config != null)
+            {
+                AnimationTime = config.animationTime;
+                paused = config.paused;
+                SetSpeed(speed);
+            }
+        }
+        UseSavedView();
+    }
+
+    // Seconds into the clip that is playing; setting it jumps there (for a paused frame saved with F5).
+    private float AnimationTime
+    {
+        get => legacyClips != null && legacyClips.Length > 0 ? legacy[legacyClips[current]].time
+             : clipPlayable.IsValid() ? (float)clipPlayable.GetTime() : 0f;
+        set
+        {
+            if (legacyClips != null && legacyClips.Length > 0) { legacy[legacyClips[current]].time = value; legacy.Sample(); }
+            else if (clipPlayable.IsValid()) clipPlayable.SetTime(value);
+        }
+    }
+
+    public void UseSavedView()
+    {
+        var display = FindAnyObjectByType<DisplayAlignment>();
+        if (display != null) display.UseView(saved);
+    }
+
+    // Shown in the H box, so a look can be read off and typed into object_configs.json exactly.
+    public string Describe()
+    {
+        Vector3 p = transform.position, r = transform.eulerAngles, s = transform.localScale / beatFactor;
+        return $"{gameObject.name}{(saved != null ? "   (saved)" : "")}" + "\n" +
+               $"pos {p.x:0.000} {p.y:0.000} {p.z:0.000}   lift {lift:0.000}" + "\n" +
+               $"rot {r.x:0.0} {r.y:0.0} {r.z:0.0}   size {s.x:0.0000}" + "\n" +
+               $"spin {(spin ? "on" : "off")} {spinAxis} {spinSpeed:0}/s" +
+               (ClipCount > 0 ? $"   anim {current + 1}/{ClipCount} x{speed:0.00}{(paused ? $" paused at {AnimationTime:0.00}s" : "")}" : "");
+    }
+
+    // Saved pose replaces the automatic size / centring / start angle / depth.
+    private void ApplyConfig(ObjectConfig c)
+    {
+        hasConfig = true;
+        saved = c;
+        if (c.scale != Vector3.zero) transform.localScale = c.scale;
+        transform.eulerAngles = c.rotation;
+        transform.position = c.position;
+        depth = c.position.z - baseZ;
+        lift = c.lift;
+        Ground();
+        if (renderers.Length > 0) height = GetBounds(renderers).size.y;
+        spin = c.spin;
+        if (!uprightOnly && System.Enum.TryParse(c.spinAxis, out SpinAxis axis)) spinAxis = axis;
+        if (c.spinSpeed > 0f) spinSpeed = c.spinSpeed;
+        if (c.animationSpeed > 0f) speed = Mathf.Clamp(c.animationSpeed, 0.01f, 2f);
+    }
+
+    private void SaveConfig()
+    {
+        var c = new ObjectConfig
+        {
+            name = gameObject.name,
+            position = transform.position,
+            lift = lift,
+            rotation = transform.eulerAngles,
+            scale = transform.localScale / beatFactor, // not mid-heartbeat
+            spin = spin,
+            spinAxis = spinAxis.ToString(),
+            spinSpeed = spinSpeed,
+            animation = ClipCount > 0 ? current + 1 : 0,
+            animationSpeed = speed,
+            paused = paused,
+            animationTime = ClipCount > 0 ? AnimationTime : 0f
+        };
+        var display = FindAnyObjectByType<DisplayAlignment>();
+        if (display != null) display.GetView(out c.sway, out c.swayAngle, out c.perspective);
+        bool ok = ObjectConfigs.Save(c);
+        if (ok) { hasConfig = true; saved = c; }
+        Say(ok ? $"Saved {gameObject.name}\n{ObjectConfigs.FilePath}" : "NOT saved: see the Console (object_configs.json unreadable or not writable)");
+    }
+
+    private void Say(string text)
+    {
+        var display = FindAnyObjectByType<DisplayAlignment>();
+        if (display != null) display.Show(text);
     }
 
     // Lets any model drop in regardless of its file units or pivot height, and keeps its base in place when resized.
@@ -162,7 +267,7 @@ public class GesturePlayer : MonoBehaviour
         Bounds b = GetBounds(renderers);
         if (Physics.Raycast(b.center, Vector3.down, out var hit, 50f))
             floorY = hit.point.y;
-        transform.position += Vector3.up * (floorY + heightOffset - b.min.y);
+        transform.position += Vector3.up * (floorY + heightOffset + lift - b.min.y);
     }
 
     private void ApplyDepth()
@@ -175,8 +280,9 @@ public class GesturePlayer : MonoBehaviour
     private void OnEnable()
     {
         if (!started) return;
-        depth = PlayerPrefs.GetFloat(DepthKey, defaultDepth);
+        if (!hasConfig) depth = PlayerPrefs.GetFloat(DepthKey, defaultDepth);
         ApplyDepth();
+        UseSavedView();
     }
 
     private void HandlePointer()
@@ -213,7 +319,7 @@ public class GesturePlayer : MonoBehaviour
             {
                 if (mouse.leftButton.isPressed) dragDelta = mouse.delta.ReadValue();
                 float scroll = mouse.scroll.ReadValue().y;
-                if (scroll != 0f) scale = 1f + Mathf.Sign(scroll) * 0.1f;
+                if (scroll != 0f) scale = 1f + Mathf.Sign(scroll) * (Fine ? 0.01f : 0.1f);
             }
         }
 
@@ -239,7 +345,7 @@ public class GesturePlayer : MonoBehaviour
         if (pitch != 0f) transform.RotateAround(center, Vector3.right, pitch);
     }
 
-    private static Bounds GetBounds(Renderer[] renderers)
+    public static Bounds GetBounds(Renderer[] renderers)
     {
         Bounds b = renderers[0].bounds;
         foreach (var r in renderers)
@@ -256,16 +362,32 @@ public class GesturePlayer : MonoBehaviour
         {
             spinAxis = (SpinAxis)(((int)spinAxis + 1) % 3);
             string[] names = { "Y  (upright turntable)", "X  (tumbles toward you)", "Z  (wheel facing you)" };
-            var display = FindAnyObjectByType<DisplayAlignment>();
-            if (display != null) display.Show("Spin axis " + names[(int)spinAxis] + (spin ? "" : "   -  R starts it"));
+            Say("Spin axis " + names[(int)spinAxis] + (spin ? "" : "   -  R starts it"));
+        }
+        if (keyboard != null && keyboard.f5Key.wasPressedThisFrame)
+            SaveConfig();
+        if (keyboard != null && keyboard.f8Key.wasPressedThisFrame)
+        {
+            Say(ObjectConfigs.Remove(gameObject.name) ? $"Forgot {gameObject.name}: back to defaults at next start" : $"{gameObject.name} has nothing saved");
+            saved = null;
+            UseSavedView();
         }
 
         HandlePointer();
 
         // Up/Down tilt, Q/E turn (Shift+Up/Down is the display alignment, so leave those alone).
-        if (keyboard != null && !keyboard.shiftKey.isPressed)
+        bool ctrl = keyboard != null && keyboard.ctrlKey.isPressed;
+        if (ctrl)
         {
-            float step = keyTurnSpeed * Time.deltaTime;
+            float step = moveSpeed * Time.deltaTime * (Fine ? 0.1f : 1f);
+            float dx = (keyboard.rightArrowKey.isPressed ? step : 0f) - (keyboard.leftArrowKey.isPressed ? step : 0f);
+            float dy = (keyboard.upArrowKey.isPressed ? step : 0f) - (keyboard.downArrowKey.isPressed ? step : 0f);
+            if (dx != 0f) transform.position += Vector3.right * dx;
+            if (dy != 0f) { lift += dy; Ground(); }
+        }
+        else if (keyboard != null && !keyboard.shiftKey.isPressed)
+        {
+            float step = keyTurnSpeed * Time.deltaTime * (Fine ? 0.1f : 1f);
             float pitch = (keyboard.upArrowKey.isPressed ? step : 0f) - (keyboard.downArrowKey.isPressed ? step : 0f);
             float yaw = (keyboard.eKey.isPressed ? step : 0f) - (keyboard.qKey.isPressed ? step : 0f);
             if (yaw != 0f) spin = false;
@@ -275,10 +397,11 @@ public class GesturePlayer : MonoBehaviour
             float push = (keyboard.wKey.isPressed ? 1f : 0f) - (keyboard.sKey.isPressed ? 1f : 0f);
             if (push != 0f && started)
             {
-                depth += push * depthSpeed * Time.deltaTime;
+                depth += push * depthSpeed * Time.deltaTime * (Fine ? 0.1f : 1f);
                 ApplyDepth();
             }
-            if (keyboard.wKey.wasReleasedThisFrame || keyboard.sKey.wasReleasedThisFrame)
+            // Saved objects keep their own depth (F5); the shared one is for all the others.
+            if (!hasConfig && (keyboard.wKey.wasReleasedThisFrame || keyboard.sKey.wasReleasedThisFrame))
             {
                 PlayerPrefs.SetFloat(DepthKey, depth);
                 PlayerPrefs.Save();
@@ -312,9 +435,9 @@ public class GesturePlayer : MonoBehaviour
             }
 
             if (keyboard.minusKey.wasPressedThisFrame || keyboard.numpadMinusKey.wasPressedThisFrame)
-                SetSpeed(speed - 0.1f);
+                SetSpeed(speed - (Fine ? 0.01f : 0.1f));
             if (keyboard.equalsKey.wasPressedThisFrame || keyboard.numpadPlusKey.wasPressedThisFrame)
-                SetSpeed(speed + 0.1f);
+                SetSpeed(speed + (Fine ? 0.01f : 0.1f));
             if (keyboard.backspaceKey.wasPressedThisFrame)
                 SetSpeed(1f);
         }
@@ -367,7 +490,7 @@ public class GesturePlayer : MonoBehaviour
 
     private void SetSpeed(float value)
     {
-        speed = Mathf.Clamp(Mathf.Round(value * 10f) / 10f, 0.1f, 2f);
+        speed = Mathf.Clamp(Mathf.Round(value * 100f) / 100f, 0.01f, 2f);
         float playing = paused ? 0f : speed;
         if (clipPlayable.IsValid())
             clipPlayable.SetSpeed(playing);
