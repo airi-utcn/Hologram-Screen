@@ -203,9 +203,30 @@ public static class MonitorDetector
             return;
         }
 
+#if UNITY_STANDALONE_WIN && !UNITY_EDITOR
+        // Going windowed, moving and going fullscreen again in one frame often left a small window on the HLD.
+        // Unity's own move keeps the window fullscreen while it changes monitor.
+        if (fullscreen)
+        {
+            var layout = new List<DisplayInfo>();
+            Screen.GetDisplayLayout(layout);
+            var matches = layout.FindAll(d => d.width == monitor.Width && d.height == monitor.Height);
+            if (matches.Count == 1)
+            {
+                if (Screen.fullScreenMode != FullScreenMode.FullScreenWindow)
+                    Screen.fullScreenMode = FullScreenMode.FullScreenWindow;
+                var move = Screen.MoveMainWindowTo(matches[0], Vector2Int.zero);
+                move.completed += _ => Screen.SetResolution(monitor.Width, monitor.Height, FullScreenMode.FullScreenWindow);
+                Debug.Log($"MonitorDetector: Moving fullscreen to {monitor.DisplayName}");
+                return;
+            }
+            // several monitors with the same resolution: can't tell which one Unity means, use the old way below
+        }
+#endif
+
 #if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
         IntPtr hwnd = GetActiveWindow();
-        
+
         if (fullscreen)
         {
             // Set to windowed first to allow repositioning

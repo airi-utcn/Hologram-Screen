@@ -4,4 +4,6 @@
   <Project Path="Assembly-CSharp.csproj" />
   <Project Path="Assembly-CSharp-Editor.csproj" />
   <Project Path="HololuminescentEditor.csproj" />
+  <Project Path="Hololuminescent.MonitorDemo.csproj" />
+  <Project Path="Hololuminescent.MonitorDemo.Editor.csproj" />
 </Solution>

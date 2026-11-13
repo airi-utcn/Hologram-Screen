@@ -49,6 +49,7 @@ Press **H** in the app to show them on screen.
 
 | Key / gesture | Does |
 |---|---|
+| Tab | next experience: model showcase ↔ asteroid orbits (VQ1 / VN3) |
 | ← / → | previous / next object |
 | Drag (finger or mouse) | turn (sideways) / tilt (up-down) |
 | Pinch / mouse wheel | resize (no upper limit) |
@@ -77,6 +78,7 @@ Press **H** in the app to show them on screen.
 | `Assets/Hololuminescent/Scripts/` | Our scripts (see below) |
 | `Assets/Hololuminescent/Resources/Models/<Name>/` | **Every model the app shows**, each in its own folder with its textures and materials |
 | `Assets/Hololuminescent/Windowing/` | Looking Glass's monitor picker |
+| `Assets/VQ1Hologram/` | Second experience (from CGIS): orbits of asteroids 2018 VQ1 / VN3, scene `Generated/VQ1_Hologram.unity`, its own keys (H shows them). **Tab** switches to it and back |
 | `SourceModels/` | Original downloads (`.blend`, `.zip`, source textures). Outside `Assets`, so Unity ignores them |
 
 **Scripts**

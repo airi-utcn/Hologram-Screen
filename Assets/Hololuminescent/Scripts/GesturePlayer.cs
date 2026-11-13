@@ -41,6 +41,8 @@ public class GesturePlayer : MonoBehaviour
     [SerializeField] private float startPitch = 15f;
     [Tooltip("Turn at start, degrees: a three-quarter view shows two sides at once.")]
     [SerializeField] private float startYaw = 30f;
+    [Tooltip("Starts straight, facing the viewer (no start turn or tilt), and only ever turns around Y: no tilting, A is ignored. For logos and text.")]
+    [SerializeField] private bool uprightOnly = false;
 
     [Header("Turntable")]
     [SerializeField] private bool spin = true;
@@ -85,6 +87,7 @@ public class GesturePlayer : MonoBehaviour
     public float Heartbeat { set => heartbeat = value; }
     public bool Spin { set => spin = value; }
     public SpinAxis Axis { set => spinAxis = value; }
+    public bool UprightOnly { set => uprightOnly = value; }
 
     public enum SpinAxis { Y, X, Z }
 
@@ -102,6 +105,11 @@ public class GesturePlayer : MonoBehaviour
         depth = PlayerPrefs.GetFloat(DepthKey, defaultDepth);
         transform.position = new Vector3(transform.position.x, transform.position.y, baseZ + depth);
         started = true;
+        if (uprightOnly)
+        {
+            startYaw = startPitch = 0f;
+            spinAxis = SpinAxis.Y;
+        }
         if (fitHeight > 0f)
             Fit(fitHeight, true);
         else if (renderers.Length > 0)
@@ -225,6 +233,7 @@ public class GesturePlayer : MonoBehaviour
     private void Turn(float yaw, float pitch)
     {
         if (renderers.Length == 0) return;
+        if (uprightOnly) pitch = 0f;
         Vector3 center = GetBounds(renderers).center;
         if (yaw != 0f) transform.RotateAround(center, Vector3.up, yaw);
         if (pitch != 0f) transform.RotateAround(center, Vector3.right, pitch);
@@ -243,7 +252,7 @@ public class GesturePlayer : MonoBehaviour
         var keyboard = Keyboard.current;
         if (keyboard != null && keyboard.rKey.wasPressedThisFrame)
             spin = !spin;
-        if (keyboard != null && keyboard.aKey.wasPressedThisFrame)
+        if (keyboard != null && keyboard.aKey.wasPressedThisFrame && !uprightOnly)
         {
             spinAxis = (SpinAxis)(((int)spinAxis + 1) % 3);
             string[] names = { "Y  (upright turntable)", "X  (tumbles toward you)", "Z  (wheel facing you)" };

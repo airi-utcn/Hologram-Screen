@@ -47,6 +47,7 @@ public class DisplayAlignment : MonoBehaviour
     private const string Help =
         "CONTROLS  (H hides this)\n\n" +
         "<- / ->      switch object\n" +
+        "Tab          next experience (asteroids)\n" +
         "Drag         rotate   (1 finger / mouse)\n" +
         "Pinch        resize   (2 fingers / wheel)\n\n" +
         "1 - 9        pick animation (loops)\n" +
@@ -175,7 +176,9 @@ public class DisplayAlignment : MonoBehaviour
         };
         style.normal.textColor = Color.white;
 
-        string text = showHelp ? Help : message;
+        // Tells on the display itself whether Windows reported a touch screen to the app (if not, it's a cable / driver issue).
+        string touch = Touchscreen.current != null ? "\n\nTouch screen: found" : "\n\nTouch screen: NOT found (check the USB cable)";
+        string text = showHelp ? Help + touch : message;
         if (showHelp && Time.time <= messageUntil)
             text += "\n\n" + message;
 

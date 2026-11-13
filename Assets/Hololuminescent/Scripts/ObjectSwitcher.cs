@@ -19,6 +19,8 @@ public class ObjectSwitcher : MonoBehaviour
     [Tooltip("Resource Models that start standing still; R then spins them around Still Models Axis (A still changes it).")]
     [SerializeField] private string[] stillModels;
     [SerializeField] private GesturePlayer.SpinAxis stillModelsAxis = GesturePlayer.SpinAxis.Z;
+    [Tooltip("Resource Models (logos, text) that start straight facing the viewer and only ever turn around Y.")]
+    [SerializeField] private string[] uprightModels;
     [Tooltip("Resource Model shown when the app starts (same path as above). Empty = the first object in the list.")]
     [SerializeField] private string firstModel;
 
@@ -54,6 +56,8 @@ public class ObjectSwitcher : MonoBehaviour
                 player.Spin = false;
                 player.Axis = stillModelsAxis;
             }
+            if (uprightModels != null && System.Array.IndexOf(uprightModels, path) >= 0)
+                player.UprightOnly = true;
             if (path == firstModel)
                 first = list.Count;
             list.Add(go);

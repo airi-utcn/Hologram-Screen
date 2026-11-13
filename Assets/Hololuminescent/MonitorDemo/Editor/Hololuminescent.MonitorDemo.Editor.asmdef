@@ -1,0 +1,12 @@
+{
+    "name": "Hololuminescent.MonitorDemo.Editor",
+    "rootNamespace": "Hololuminescent.MonitorDemo.Editor",
+    "references": [],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "autoReferenced": true,
+    "noEngineReferences": false
+}

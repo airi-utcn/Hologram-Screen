@@ -1,0 +1,13 @@
+{
+    "name": "Hololuminescent.MonitorDemo",
+    "rootNamespace": "Hololuminescent.MonitorDemo",
+    "references": [
+        "Unity.InputSystem",
+        "UnityEngine.UI"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "autoReferenced": true,
+    "noEngineReferences": false
+}

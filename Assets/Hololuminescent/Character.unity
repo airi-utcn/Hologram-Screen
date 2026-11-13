@@ -435,6 +435,9 @@ MonoBehaviour:
   - Models/HumanHeart/HumanHeart
   - Models/W_I_OS/W_I_OS
   - Models/AIRI/AIRI
+  - Models/AIRI_Intro/AIRI_Intro
+  - Models/Shoe/Chemi-AU-O005
+  - Models/Parchetto/Chemi-IT-B001
   resourceFitHeight: 3.5
   heartbeatModels:
   - Models/HumanHeart/HumanHeart
@@ -442,7 +445,9 @@ MonoBehaviour:
   stillModels:
   - Models/AIRI/AIRI
   stillModelsAxis: 2
-  firstModel: Models/AIRI/AIRI
+  uprightModels:
+  - Models/AIRI_Intro/AIRI_Intro
+  firstModel: Models/AIRI_Intro/AIRI_Intro
 --- !u!114 &720000004
 MonoBehaviour:
   m_ObjectHideFlags: 0
