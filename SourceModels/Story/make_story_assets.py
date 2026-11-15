@@ -15,36 +15,46 @@ import bmesh
 import bpy
 
 OUT = Path(sys.argv[sys.argv.index("--") + 1])
-# Liberation Sans (SIL Open Font License), in the project. Not Inter: it is a variable font whose letters are
-# overlapping pieces, and thickening them left the bar of the A thinner than the rest of the letter.
-FONT = Path(__file__).resolve().parents[2] / "Assets" / "TextMesh Pro" / "Fonts" / "LiberationSans.ttf"
+# Montserrat (SIL Open Font License, fonts/OFL.txt), the static Bold and SemiBold cuts from the font's own repository
+# (github.com/JulietaUla/Montserrat). Static, not variable: a variable font's letters are overlapping pieces, which
+# broke the bar of the A once. Headlines are Bold; department names and labels SemiBold with wide letter spacing.
+FONT = Path(__file__).resolve().parent / "fonts" / "Montserrat-Bold.ttf"
+FONT_LABEL = Path(__file__).resolve().parent / "fonts" / "Montserrat-SemiBold.ttf"
+LINE_GAP = 1.12   # between the lines of a headline, in font sizes
 
 PHRASES = {
-    # The AIRI x UTCN spot
-    "Phrase_Spark": "EVERY REVOLUTION\nSTARTS WITH A SPARK.",
-    "Phrase_Learns": "IT LEARNS.",
-    "Phrase_Connects": "IT CONNECTS\nTHE WORLD.",
-    "Phrase_Heart": "BUT IT NEEDS\nA HUMAN HEART.",
-    "Phrase_Meet": "AT UTCN,\nTHEY MEET.",
-    "Phrase_Welcome": "WELCOME\nTO AIRI.",
-    "Phrase_Institute": "THE AI RESEARCH\nINSTITUTE AT UTCN.",
+    # The AIRI x UTCN spot. Headlines read like sentences (no shouting capitals, no full stops); names are tracked caps.
+    "Phrase_Spark": "Every revolution\nstarts with a spark",
+    "Phrase_Learns": "It learns",
+    "Phrase_Connects": "It connects\nthe world",
+    "Phrase_Heart": "But it needs\na human heart",
+    "Phrase_Meet": "At UTCN,\nthey meet",
+    "Phrase_Welcome": "Welcome\nto AIRI",
+    "Phrase_Institute": "The AI Research\nInstitute at UTCN",
     # its departments and centres (airi.utcluj.ro/research/departments)
-    "Dept_Micro": "MICROELECTRONICS.",
-    "Dept_Robotics": "ROBOTICS & IOT.",
-    "Dept_Autonomous": "AUTONOMOUS\nSYSTEMS.",
-    "Dept_Cyber": "CYBERSECURITY\n& SPACE.",
-    "Dept_Health": "ROBOTICS FOR\nHEALTHCARE.",
-    "Dept_Trust": "TRUSTWORTHY AI.",
-    "Dept_Measure": "AI MEASUREMENT.",
-    "Dept_Immersive": "IMMERSIVE\nEDUCATION.",
-    "Dept_Labelling": "DATA LABELLING.",
-    "Dept_HPC": "HPC-AI.",
-    "Phrase_Future": "THE FUTURE\nSTARTS HERE.",
-    "Phrase_JoinUs": "JOIN US.",
+    "Dept_Micro": "MICROELECTRONICS",
+    "Dept_Robotics": "ROBOTICS & IoT",
+    "Dept_Autonomous": "AUTONOMOUS\nSYSTEMS",
+    "Dept_Cyber": "CYBERSECURITY\n& SPACE",
+    "Dept_Health": "ROBOTICS FOR\nHEALTHCARE",
+    "Dept_Trust": "TRUSTWORTHY AI",
+    "Dept_Measure": "AI MEASUREMENT",
+    "Dept_Immersive": "IMMERSIVE\nEDUCATION",
+    "Dept_Labelling": "DATA LABELLING",
+    "Dept_HPC": "HPC-AI",
+    "Phrase_5G": "5G-SHARE",
+    "Phrase_5GNet": "Four countries,\none 5G network",
+    # 5G-SHARE partner countries, as labels over the campus hubs
+    "Code_IE": "IE",
+    "Code_RO": "RO",
+    "Code_CZ": "CZ",
+    "Code_IT": "IT",
+    "Phrase_Future": "The future\nstarts here",
+    "Phrase_JoinUs": "Join us",
     # The health spot
-    "Phrase_Health": "AI FOR\nHEALTH.",
-    "Phrase_Sees": "IT SEES WHAT\nWE MISS.",
-    "Phrase_Sight": "EARLY DETECTION.\nSAVED SIGHT.",
+    "Phrase_Health": "AI for health",
+    "Phrase_Sees": "It sees what\nwe miss",
+    "Phrase_Sight": "Early detection,\nsaved sight",
     "Phrase_AIRIxUTCN": "AIRI \u00d7 UTCN",
 }
 
@@ -71,6 +81,7 @@ GLASS = material("Glass", (0.02, 0.04, 0.05), 0.08, 0.4)
 LEAF = material("Leaf", (0.013, 0.07, 0.02), 0.7)
 FINS = material("Fins", (0.42, 0.42, 0.43), 0.5)          # the building's light fins and slab edges
 SOLAR = material("Solar", (0.01, 0.02, 0.06), 0.15, 0.5)  # roof solar panels
+PCB = material("PCB", (0.02, 0.09, 0.04), 0.4)            # circuit board (Unity: textured with traces and vias)
 
 
 def clear():
@@ -78,7 +89,28 @@ def clear():
         bpy.data.objects.remove(ob)
 
 
+UV_PER_UNIT = 2.0   # texture repeats every half unit of model space
+
+
+def box_uv(mesh):
+    """Box projection: each face takes its UVs from the two axes it faces least, so textures sit square on boxes."""
+    bm = bmesh.new()
+    bm.from_mesh(mesh)
+    uv = bm.loops.layers.uv.verify()
+    for f in bm.faces:
+        nx, ny, nz = (abs(c) for c in f.normal)
+        for loop in f.loops:
+            x, y, z = loop.vert.co
+            loop[uv].uv = ((x, y) if nz >= nx and nz >= ny else (y, z) if nx >= ny else (x, z))
+            loop[uv].uv = (loop[uv].uv[0] * UV_PER_UNIT, loop[uv].uv[1] * UV_PER_UNIT)
+    bm.to_mesh(mesh)
+    bm.free()
+
+
 def export(name):
+    for ob in list(bpy.data.objects):
+        if ob is not None and ob.type == "MESH" and not ob.data.uv_layers:
+            box_uv(ob.data)
     bpy.ops.object.select_all(action="DESELECT") if bpy.ops.object.select_all.poll() else None
     for ob in bpy.context.view_layer.objects:
         ob.select_set(True)
@@ -95,22 +127,19 @@ def link(ob):
 
 # ---------------------------------------------------------------- text
 
-def text_mesh(body):
-    """The whole headline as one mesh, upright: letters in the XZ plane, front faces toward -Y."""
-    font = bpy.data.fonts.load(str(FONT), check_existing=True)
+def text_mesh(body, font=None, tracking=1.0):
+    """One line of text as a mesh, upright: letters in the XZ plane, front faces toward -Y, centred on x = 0."""
     curve = bpy.data.curves.new("text", "FONT")
     curve.body = body
-    curve.font = font
+    curve.font = bpy.data.fonts.load(str(font or FONT), check_existing=True)
     curve.size = 1.0
     curve.align_x = "CENTER"
     curve.align_y = "CENTER"
-    curve.space_line = 1.05
-    curve.space_character = 1.1   # air between the capitals (the thickening narrows the gaps)
-    curve.offset = 0.022        # Regular thickened into a bold headline; clean on this font's single-contour letters
-    curve.extrude = 0.09
-    curve.bevel_depth = 0.01
+    curve.space_character = tracking
+    curve.extrude = 0.045        # slim: reads as crisp lettering, not blocks
+    curve.bevel_depth = 0.006    # a fine bevel catches the light along every edge
     curve.bevel_resolution = 3
-    curve.resolution_u = 14
+    curve.resolution_u = 16
     ob = link(bpy.data.objects.new("text", curve))
     bpy.context.view_layer.update()
     mesh = bpy.data.meshes.new_from_object(ob.evaluated_get(bpy.context.evaluated_depsgraph_get()))
@@ -123,7 +152,7 @@ def text_mesh(body):
 
 
 def split_letters(mesh):
-    """Connected parts = letters (all headlines are capitals, so no letter is in two pieces)."""
+    """Connected parts = letters, left to right; the dot of an i or j (its own piece) joins the stem beneath it."""
     bm = bmesh.new()
     bm.from_mesh(mesh)
     bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-6)
@@ -162,31 +191,61 @@ def split_letters(mesh):
     return letters
 
 
+def join_dots(parts):
+    """Merges each small piece that sits over a taller one (the dot of i / j) into it."""
+    def box(bm):
+        xs = [v.co.x for v in bm.verts]
+        zs = [v.co.z for v in bm.verts]
+        return min(xs), max(xs), min(zs), max(zs)
+    boxes = [box(bm) for bm in parts]
+    keep = []
+    for i, (x0, x1, z0, z1) in enumerate(boxes):
+        cx = (x0 + x1) / 2
+        host = next((j for j, (a0, a1, b0, b1) in enumerate(boxes)
+                     if j != i and a0 <= cx <= a1 and z0 > b1 and (z1 - z0) < 0.45 * (b1 - b0)), None)
+        if host is None:
+            keep.append(i)
+            continue
+        mesh = bpy.data.meshes.new("dot")
+        parts[i].to_mesh(mesh)
+        parts[host].from_mesh(mesh)   # appends the dot's geometry to its letter
+        bpy.data.meshes.remove(mesh)
+    return [parts[i] for i in keep]
+
+
 def make_phrase(name, body):
+    """A headline: each line built on its own (so letters with descenders never change line), its letters as
+    separate objects L00, L01, ... in reading order, each with its origin in its middle."""
     clear()
     root = link(bpy.data.objects.new(name, None))
-    parts = []
-    for part in split_letters(text_mesh(body)):
-        xs = [v.co.x for v in part.verts]
-        zs = [v.co.z for v in part.verts]
-        mid = ((min(xs) + max(xs)) / 2, 0.0, (min(zs) + max(zs)) / 2)
-        bmesh.ops.translate(part, verts=part.verts, vec=(-mid[0], 0.0, -mid[2]))
-        parts.append((mid, part))
-    # Reading order: lines from the top, then left to right (a line is about 1 unit tall).
-    parts.sort(key=lambda p: (-round(p[0][2]), p[0][0]))
-    for i, (mid, part) in enumerate(parts):
-        mesh = bpy.data.meshes.new(f"L{i:02d}")
-        part.to_mesh(mesh)
-        part.free()
-        mesh.materials.append(TEXT_SIDE)
-        mesh.materials.append(TEXT_FACE)
-        if hasattr(mesh, "set_sharp_from_angle"):
-            mesh.set_sharp_from_angle(angle=math.radians(35))
-        ob = link(bpy.data.objects.new(f"L{i:02d}", mesh))
-        ob.location = mid
-        ob.parent = root
+    label = name.startswith(("Dept_", "Code_"))
+    lines = body.split("\n")
+    count = 0
+    for k, line in enumerate(lines):
+        dz = ((len(lines) - 1) / 2 - k) * LINE_GAP
+        parts = join_dots(split_letters(text_mesh(line, FONT_LABEL if label else FONT, 1.35 if label else 1.02)))
+        placed = []
+        for part in parts:
+            xs = [v.co.x for v in part.verts]
+            zs = [v.co.z for v in part.verts]
+            mid = ((min(xs) + max(xs)) / 2, 0.0, (min(zs) + max(zs)) / 2)
+            bmesh.ops.translate(part, verts=part.verts, vec=(-mid[0], 0.0, -mid[2]))
+            placed.append(((mid[0], 0.0, mid[2] + dz), part))
+        placed.sort(key=lambda p: p[0][0])
+        for mid, part in placed:
+            mesh = bpy.data.meshes.new(f"L{count:02d}")
+            part.to_mesh(mesh)
+            part.free()
+            mesh.materials.append(TEXT_SIDE)
+            mesh.materials.append(TEXT_FACE)
+            if hasattr(mesh, "set_sharp_from_angle"):
+                mesh.set_sharp_from_angle(angle=math.radians(35))
+            ob = link(bpy.data.objects.new(f"L{count:02d}", mesh))
+            ob.location = mid
+            ob.parent = root
+            count += 1
     export(name)
-    return len(parts)
+    return count
 
 
 # ---------------------------------------------------------------- set pieces
@@ -467,7 +526,7 @@ def part(name, parent, build, origin=(0, 0, 0)):
     mesh = bpy.data.meshes.new(name)
     bm.to_mesh(mesh)
     bm.free()
-    for m in (GRAPHITE, RED, CONCRETE, LEAF, GLASS, FINS):
+    for m in (GRAPHITE, RED, CONCRETE, LEAF, GLASS, FINS, PCB):
         mesh.materials.append(m)
     ob = link(bpy.data.objects.new(name, mesh))
     ob.location = origin
@@ -475,7 +534,7 @@ def part(name, parent, build, origin=(0, 0, 0)):
     return ob
 
 
-G, R, C, L, GL, F = range(6)   # material slots of part(): graphite, red, concrete, green, glass, light metal
+G, R, C, L, GL, F, PC = range(7)   # material slots of part(): graphite, red, concrete, green, glass, light metal, PCB
 
 
 def cube(bm, size, center, mat, bevel=0.0):
@@ -536,7 +595,7 @@ def chip():
     W, D, T = 1.6, 1.0, 0.03
 
     def board(bm):
-        cube(bm, (W, D, T), (0, 0, T / 2), L, 0.01)
+        cube(bm, (W, D, T), (0, 0, T / 2), PC, 0.01)
         for x, y in ((-0.74, -0.44), (0.74, -0.44), (0.74, 0.44), (-0.74, 0.44)):   # mounting holes (metal rings)
             tube(bm, 0.03, 0.004, (x, y, T + 0.002), F, segments=20)
             tube(bm, 0.016, 0.006, (x, y, T + 0.003), G, segments=16)
@@ -902,12 +961,192 @@ def rack():
     export("Rack")
 
 
+# ---------------------------------------------------------------- textures
+
+def textures(out):
+    """Tileable 512 px textures with matching normal maps, made from filtered noise (seamless by construction):
+    brushed metal, concrete, grass, a circuit board with traces and vias, textured dark plastic, red paint and
+    solar cells. Written as PNG into `out`; install_story.py hooks them onto the materials."""
+    import numpy as np
+    N = 512
+    rng = np.random.default_rng(42)
+    fy, fx = np.meshgrid(np.fft.fftfreq(N), np.fft.fftfreq(N), indexing="ij")
+
+    def noise(scale, stretch=(1.0, 1.0)):
+        """Seamless noise: white noise low-passed in frequency space; `stretch` makes it streaky."""
+        f = np.sqrt((fx * stretch[0]) ** 2 + (fy * stretch[1]) ** 2)
+        spectrum = np.fft.fft2(rng.standard_normal((N, N))) * np.exp(-(f * N / scale) ** 2)
+        n = np.real(np.fft.ifft2(spectrum))
+        return (n - n.mean()) / (n.std() + 1e-9)
+
+    def normal_map(height, strength):
+        dx = (np.roll(height, -1, 1) - np.roll(height, 1, 1)) * strength
+        dy = (np.roll(height, -1, 0) - np.roll(height, 1, 0)) * strength
+        n = np.dstack((-dx, -dy, np.ones_like(height)))
+        n /= np.linalg.norm(n, axis=2, keepdims=True)
+        return n * 0.5 + 0.5
+
+    def save(name, rgb):
+        img = bpy.data.images.new(name, N, N, alpha=False)
+        rgba = np.dstack((np.clip(rgb, 0, 1), np.ones((N, N))))
+        img.pixels = rgba[::-1].reshape(-1).tolist()   # Blender stores rows bottom-up
+        img.filepath_raw = str(out / f"{name}.png")
+        img.file_format = "PNG"
+        img.save()
+        print(f"  {name}.png")
+
+    def colour(base, *layers):
+        return np.dstack([np.full((N, N), base[i]) + sum(a * l for a, l in layers) for i in range(3)])
+
+    # Brushed metal: fine streaks along one direction.
+    h = noise(180, (0.04, 1.0)) * 0.7 + noise(40) * 0.3
+    save("Tex_Metal", colour((0.70, 0.71, 0.72), (0.045, h)))
+    save("Tex_Metal_N", normal_map(h, 0.6))
+    # Concrete: soft blotches, grain and dark pores.
+    h = noise(14) * 0.6 + noise(120) * 0.4
+    pores = (noise(200) < -2.0).astype(float)
+    save("Tex_Concrete", colour((0.55, 0.55, 0.56), (0.05, h), (-0.12, pores)))
+    save("Tex_Concrete_N", normal_map(h - pores * 2, 0.9))
+    # Grass: green variation and fine vertical blades.
+    blades = noise(220, (1.0, 0.08))
+    h = noise(10) * 0.5 + blades * 0.5
+    g = np.dstack((0.16 + 0.05 * h, 0.34 + 0.07 * h, 0.12 + 0.03 * h))
+    save("Tex_Grass", g)
+    save("Tex_Grass_N", normal_map(blades, 1.2))
+    # Circuit board: dark green solder mask, random right-angle traces, vias (tinned dots).
+    board = np.zeros((N, N))
+    for _ in range(140):
+        x, y = rng.integers(0, N, 2)
+        for _ in range(rng.integers(2, 5)):
+            length = int(rng.integers(20, 140))
+            if rng.random() < 0.5:
+                xs = (x + np.sign(rng.standard_normal()) * np.arange(length)).astype(int) % N
+                board[y % N, xs] = 1
+                board[(y + 1) % N, xs] = 1
+                x = xs[-1]
+            else:
+                ys = (y + np.sign(rng.standard_normal()) * np.arange(length)).astype(int) % N
+                board[ys, x % N] = 1
+                board[ys, (x + 1) % N] = 1
+                y = ys[-1]
+    yy, xx = np.mgrid[0:N, 0:N]
+    vias = np.zeros((N, N))
+    for _ in range(90):
+        cx, cy = rng.integers(0, N, 2)
+        d2 = ((xx - cx + N / 2) % N - N / 2) ** 2 + ((yy - cy + N / 2) % N - N / 2) ** 2
+        vias = np.maximum(vias, (d2 < 16).astype(float))
+    mask = noise(30) * 0.02
+    copper = np.maximum(board, vias)
+    pcb = np.dstack((0.05 + mask + copper * 0.55, 0.22 + mask + copper * 0.45, 0.10 + mask + copper * 0.25))
+    save("Tex_PCB", pcb)
+    save("Tex_PCB_N", normal_map(copper * 1.0 + noise(60) * 0.05, 0.8))
+    # Dark plastic: fine grain.
+    h = noise(150)
+    save("Tex_Plastic", colour((0.13, 0.12, 0.12), (0.012, h)))
+    save("Tex_Plastic_N", normal_map(h, 0.25))
+    # Red paint: slight orange-peel.
+    h = noise(60)
+    save("Tex_Paint", colour((0.63, 0.13, 0.10), (0.015, h)))
+    save("Tex_Paint_N", normal_map(h, 0.2))
+    # Solar cells: navy cells in a light grid with thin busbars.
+    cells = 8
+    grid = ((xx % (N // cells) < 3) | (yy % (N // cells) < 3)).astype(float)
+    bus = (((xx % (N // cells)) - N // cells // 3) % (N // cells // 3) < 1).astype(float) * (1 - grid)
+    shimmer = noise(40) * 0.015
+    solar = np.dstack((0.08 + shimmer + grid * 0.55 + bus * 0.25, 0.11 + shimmer + grid * 0.55 + bus * 0.25, 0.24 + shimmer + grid * 0.5 + bus * 0.25))
+    save("Tex_Solar", solar)
+    save("Tex_Solar_N", normal_map(-grid, 0.6))
+
+
+# ---------------------------------------------------------------- 5G-SHARE
+
+def tower():
+    """A 5G mast: a three-legged lattice tower with cross bracing, a platform near the top with three sector antenna
+    panels (Sector0..2), two microwave dishes, cable trays, a red aviation light on top (Beacon) and an equipment
+    cabinet at the foot. Base at z = 0, about 1.6 tall."""
+    from mathutils import Vector, Matrix
+    clear()
+    root = link(bpy.data.objects.new("Tower5G", None))
+    H, r0, r1 = 1.45, 0.16, 0.05
+    legs = [math.radians(90 + 120 * i) for i in range(3)]
+
+    def at(a, z):
+        r = r0 + (r1 - r0) * z / H
+        return Vector((r * math.cos(a), r * math.sin(a), z))
+
+    def strut(bm, p, q, radius, mat):
+        d = q - p
+        m = Matrix.Translation((p + q) / 2) @ d.to_track_quat("Z", "Y").to_matrix().to_4x4()
+        res = bmesh.ops.create_cone(bm, cap_ends=True, segments=6, radius1=radius, radius2=radius, depth=d.length, matrix=m)
+        for v in res["verts"]:
+            for f in v.link_faces:
+                f.material_index = mat
+
+    def lattice(bm):
+        for a in legs:
+            strut(bm, at(a, 0), at(a, H), 0.012, F)
+        levels = 9
+        for k in range(levels):
+            z0, z1 = H * k / levels, H * (k + 1) / levels
+            for i in range(3):
+                a, b = legs[i], legs[(i + 1) % 3]
+                strut(bm, at(a, z0), at(b, z1), 0.005, F)       # diagonals
+                strut(bm, at(a, z1), at(b, z1), 0.005, F)       # rings
+        tube(bm, 0.2, 0.02, (0, 0, H - 0.18), G, segments=24)    # platform
+        cube(bm, (0.03, 0.03, H - 0.1), (0.05, 0.0, (H - 0.1) / 2), G)   # cable tray
+        cube(bm, (0.42, 0.32, 0.04), (0, 0, 0.02), C, 0.01)      # foundation
+        cube(bm, (0.16, 0.12, 0.22), (0.24, -0.08, 0.13), F, 0.01)   # equipment cabinet
+        cube(bm, (0.15, 0.01, 0.18), (0.24, -0.145, 0.13), G)
+        tube(bm, 0.012, 0.12, (0, 0, H + 0.06), G)
+        for i, a in enumerate((0.0, 2.2)):                       # microwave dishes
+            c = Vector((0.13 * math.cos(a), 0.13 * math.sin(a), H - 0.32))
+            m = Matrix.Translation(c) @ Matrix.Rotation(a, 4, "Z") @ Matrix.Rotation(math.pi / 2, 4, "Y")
+            res = bmesh.ops.create_cone(bm, cap_ends=True, segments=24, radius1=0.07, radius2=0.03, depth=0.04, matrix=m)
+            for v in res["verts"]:
+                for f in v.link_faces:
+                    f.material_index = F
+    part("Lattice", root, lattice)
+    for i, a in enumerate(legs):                                  # sector antennas, facing out
+        c = (0.17 * math.cos(a), 0.17 * math.sin(a), H - 0.05)
+
+        def sector(bm, a=a, c=c):
+            m = Matrix.Translation(c) @ Matrix.Rotation(a, 4, "Z") @ Matrix.Diagonal((0.035, 0.09, 0.26, 1.0))
+            res = bmesh.ops.create_cube(bm, size=1.0, matrix=m)
+            for v in res["verts"]:
+                for f in v.link_faces:
+                    f.material_index = C
+        part(f"Sector{i}", root, sector, c)
+    part("Beacon", root, lambda bm: ball(bm, 0.022, (0, 0, H + 0.13), R), (0, 0, H + 0.13))
+    export("Tower5G")
+
+
+def hub():
+    """A partner campus for 5G-SHARE: a low glass-and-fin building on a lawn plot with a 5G antenna on its roof
+    (Antenna, its top is where links attach). Base at z = 0, about 0.55 wide."""
+    from mathutils import Matrix
+    clear()
+    root = link(bpy.data.objects.new("Hub", None))
+
+    def building(bm):
+        cube(bm, (0.6, 0.45, 0.02), (0, 0, 0.01), L)
+        cube(bm, (0.42, 0.26, 0.2), (0, 0.03, 0.12), GL, 0.006)
+        for z in (0.03, 0.1, 0.17, 0.225):
+            cube(bm, (0.44, 0.28, 0.012), (0, 0.03, z), F)
+        for i in range(13):
+            cube(bm, (0.006, 0.015, 0.2), (-0.2 + i * 0.0333, -0.11, 0.12), F)
+        cube(bm, (0.12, 0.09, 0.05), (-0.1, 0.06, 0.255), G, 0.006)
+        cube(bm, (0.1, 0.006, 0.08), (0.0, -0.105, 0.05), G)
+    part("Building", root, building)
+    part("Antenna", root, lambda bm: (tube(bm, 0.006, 0.18, (0.12, 0.05, 0.32), F), cube(bm, (0.018, 0.03, 0.08), (0.12, 0.05, 0.38), C, 0.004)), (0.12, 0.05, 0.42))
+    export("Hub")
+
+
 if __name__ == "__main__":
     OUT.mkdir(parents=True, exist_ok=True)
     print(f"Story assets -> {OUT}")
     for name, body in PHRASES.items():
         n = make_phrase(name, body)
-        expected = len(body.replace(" ", "").replace("\n", ""))  # the multiplication sign is one piece too
+        expected = len(body.replace(" ", "").replace("\n", ""))  # one piece per character (i / j dots joined)
         assert n == expected, f"{name}: {n} pieces for {expected} characters (a letter split or merged)"
     ring()
     lab()
@@ -922,6 +1161,9 @@ if __name__ == "__main__":
     vr_headset()
     labelling()
     rack()
+    tower()
+    hub()
+    textures(OUT)
     tree()
     lamp()
     plaza()

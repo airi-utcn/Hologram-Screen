@@ -11,7 +11,7 @@ using UnityEngine.SceneManagement;
 /// One thread runs through each: every image turns into the next through a swarm of particles that leaves one shape
 /// and gathers into the next, so the story flows instead of things popping in and out.
 ///
-/// 1. AIRI x UTCN (~77 s). A red spark drifts in and comes to rest: EVERY REVOLUTION STARTS WITH A SPARK. A neural
+/// 1. AIRI x UTCN (~83 s). A red spark drifts in and comes to rest: EVERY REVOLUTION STARTS WITH A SPARK. A neural
 ///    network grows out of it, signals running along its links: IT LEARNS. The neurons settle onto a globe as city
 ///    lights while the spark circles it: IT CONNECTS THE WORLD. The world becomes a beating heart: BUT IT NEEDS A
 ///    HUMAN HEART. The spark spirals into the heart and the two become the AIRI logo, standing on the floor: AT UTCN,
@@ -23,8 +23,9 @@ using UnityEngine.SceneManagement;
 ///    (AUTONOMOUS SYSTEMS.), a padlock circled by a satellite (CYBERSECURITY & SPACE.), the OCT retina scan with its
 ///    fluids found (ROBOTICS FOR HEALTHCARE.), a balance settling level (TRUSTWORTHY AI.), a gauge and a growing chart
 ///    (AI MEASUREMENT.), a VR headset among virtual windows (IMMERSIVE EDUCATION.), objects getting boxes and labels
-///    (DATA LABELLING.), a server rack blinking (HPC-AI.). It all becomes the AIRI and UTCN logos: THE FUTURE STARTS
-///    HERE. JOIN US.
+///    (DATA LABELLING.), a server rack blinking (HPC-AI.). Then 5G-SHARE, AIRI's EU project linking four campuses:
+///    a 5G mast sends waves and data along arcs to campus hubs in Ireland, Romania, the Czech Republic and Italy
+///    (5G-SHARE. 4 COUNTRIES. ONE 5G NETWORK.). It all becomes the AIRI and UTCN logos: THE FUTURE STARTS HERE. JOIN US.
 /// 2. AI for health (~22 s), with the OCT retina scan (W_I_OS): a scan beam passes and the fluid pockets show and
 ///    pulse: AI FOR HEALTH. IT SEES WHAT WE MISS. EARLY DETECTION. SAVED SIGHT. It becomes the AIRI and UTCN logos,
 ///    side by side on the floor: AIRI x UTCN.
@@ -43,7 +44,7 @@ public class StoryDirector : MonoBehaviour
 
     // Layout above the floor, world units. The showcase frames objects up to about 4.5 above it.
     private const float Mid = 1.55f;                                // where floating things sit
-    private const float TextY = 3.65f, TextHeight = 0.9f, TextWidth = 2.9f, TextForward = 0.6f;
+    private const float TextY = 3.65f, TextHeight = 0.62f, TextWidth = 2.5f, TextForward = 0.6f; // headlines: compact, with air round them
     private const int SwarmSize = 80;
 
     private ObjectSwitcher switcher;
@@ -253,20 +254,33 @@ public class StoryDirector : MonoBehaviour
             previous = stage;
             beat += 2.8f;
         }
-        var dna = previous;
+
+        // 5G-SHARE: a mast links four partner campuses across Europe.
+        yield return At(66.6f);
+        var (network5G, alive5G) = FiveGShare();
+        yield return Morph(previous, network5G, 0.9f);
+        StartCoroutine(alive5G);
+        yield return At(67.4f);
+        text = Phrase("Phrase_5G");
+        yield return At(69.4f);
+        StartCoroutine(PhraseOut(text));
+        yield return At(69.8f);
+        text = Phrase("Phrase_5GNet");
+        yield return At(72.2f);
+        StartCoroutine(PhraseOut(text));
 
         // It all becomes AIRI and UTCN.
-        yield return At(66.6f);
+        yield return At(72.6f);
         var logos = LogoPair(0.95f, 0.3f);
-        yield return Morph(dna, logos, 1.4f);
+        yield return Morph(network5G, logos, 1.4f);
         StartCoroutine(Sway(logos, 10f, 0.3f, 10.2f));
-        yield return At(67.4f);
+        yield return At(73.4f);
         text = Phrase("Phrase_Future");
-        yield return At(71.4f);
+        yield return At(77.4f);
         StartCoroutine(PhraseOut(text));
-        yield return At(71.8f);
+        yield return At(77.8f);
         text = Phrase("Phrase_JoinUs");
-        yield return At(76.0f);
+        yield return At(82.0f);
         StartCoroutine(PhraseOut(text));
         yield return ShrinkToMiddle(logos, 0.9f);
     }
@@ -331,6 +345,114 @@ public class StoryDirector : MonoBehaviour
             var rack = Hero("Story/Rack", 1.5f, 0f, 0f, 1.0f);
             return (rack, Blink(rack, "Led"));
         });
+    }
+
+    // ---------------------------------------------------------------- 5G-SHARE
+
+    // The mast in the middle and the four partner campuses round it (Ireland, Romania, Czech Republic, Italy), each
+    // labelled with its country code.
+    private (GameObject, IEnumerator) FiveGShare()
+    {
+        var tower = Hero("Story/Tower5G", 1.75f, 0f, 0f, 1.0f, center.x, center.z + 0.2f);
+        var parts = new List<GameObject> { tower };
+        var hubs = new List<GameObject>();
+        string[] codes = { "IE", "RO", "CZ", "IT" };
+        (float x, float z)[] spots = { (-1.15f, -0.55f), (1.15f, -0.55f), (-0.9f, 0.85f), (0.9f, 0.85f) }; // inside the alcove (half-width about 1.6)
+        for (int i = 0; i < 4; i++)
+        {
+            var hub = Hero("Story/Hub", 0.42f, 0f, 0f, 0.62f, center.x + spots[i].x, center.z + spots[i].z);
+            hubs.Add(hub);
+            parts.Add(hub);
+            var label = Load("Story/Code_" + codes[i], Quaternion.Euler(0f, 180f, 0f));
+            var lb = GesturePlayer.GetBounds(Parts(label));
+            label.transform.localScale *= 0.13f / lb.size.y;
+            Stand(label, Top(hub) + Vector3.up * 0.06f);
+            parts.Add(label);
+        }
+        var group = Group("5G-SHARE", parts.ToArray());
+        return (group, FiveGAlive(group, tower, hubs));
+    }
+
+    // Links grow from the mast's antennas to each campus's antenna as arcs; data packets run along them both ways;
+    // 5G waves spread from the antennas; the aviation light blinks.
+    private IEnumerator FiveGAlive(GameObject group, GameObject tower, List<GameObject> hubs)
+    {
+        Transform beacon = FindChild(tower.transform, "Beacon");
+        var sectors = new List<Transform>();
+        for (int i = 0; i < 3; i++) { var t = FindChild(tower.transform, "Sector" + i); if (t != null) sectors.Add(t); }
+        Vector3 Source()
+        {
+            Vector3 sum = Vector3.zero;
+            foreach (var t in sectors) sum += t.GetComponent<Renderer>().bounds.center;
+            return sectors.Count > 0 ? sum / sectors.Count : Top(tower);
+        }
+        var ends = hubs.ConvertAll(h => FindChild(h.transform, "Antenna"));
+        var lines = new List<LineRenderer>();
+        foreach (var _ in hubs)
+        {
+            var go = new GameObject("Link");
+            go.transform.SetParent(group.transform, true);
+            var line = go.AddComponent<LineRenderer>();
+            line.sharedMaterial = red;
+            line.widthMultiplier = 0.012f;
+            line.positionCount = 24;
+            line.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            lines.Add(line);
+        }
+        Vector3 Arc(Vector3 a, Vector3 b, float t)
+        {
+            Vector3 top = (a + b) * 0.5f + Vector3.up * (0.35f + 0.15f * (a - b).magnitude);
+            float u = 1f - t;
+            return u * u * a + 2f * u * t * top + t * t * b;
+        }
+        Vector3 End(int i) => ends[i] != null ? ends[i].GetComponent<Renderer>().bounds.max - Vector3.up * 0.01f : Top(hubs[i]);
+        float nextPacket = 0f, nextWave = 0.2f;
+        var rnd = new System.Random(15);
+        for (float time = 0f; group != null && tower != null; time += Time.deltaTime)
+        {
+            Vector3 a = Source();
+            for (int i = 0; i < lines.Count; i++)
+            {
+                if (lines[i] == null || hubs[i] == null) continue;
+                float grown = Smooth(Mathf.Clamp01((time - i * 0.15f) / 0.7f));   // each link reaches out in turn
+                for (int k = 0; k < lines[i].positionCount; k++)
+                    lines[i].SetPosition(k, Arc(a, End(i), grown * k / (lines[i].positionCount - 1f)));
+            }
+            if (time > 0.8f && time >= nextPacket)
+            {
+                nextPacket = time + 0.09f;
+                int i = rnd.Next(hubs.Count);
+                bool outward = rnd.Next(3) > 0;
+                StartCoroutine(Packet(group, () => Source(), () => End(i), outward, Arc));
+            }
+            if (time >= nextWave)
+            {
+                nextWave = time + 0.75f;
+                var ring = Load("Story/Ring", Quaternion.identity);
+                ring.transform.SetParent(group.transform, true);
+                Vector3 at = a;
+                StartCoroutine(Tween(1.3f, t => { if (ring != null) { ring.transform.position = at; ring.transform.localScale = Vector3.one * Mathf.Max(0.001f, Mathf.Lerp(0.15f, 1.6f, t) * (1f - t * t)); } }));
+                StartCoroutine(Delayed(1.35f, Drop(ring)));
+            }
+            if (beacon != null) beacon.GetComponent<Renderer>().sharedMaterial = (time % 1f) < 0.5f ? red : dark;
+            yield return null;
+        }
+    }
+
+    // A small red packet runs along a link from the mast to a campus, or back.
+    private IEnumerator Packet(GameObject group, Func<Vector3> from, Func<Vector3> to, bool outward, Func<Vector3, Vector3, float, Vector3> arc)
+    {
+        var dot = Primitive(PrimitiveType.Sphere, "Packet", red);
+        dot.GetComponent<Renderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        dot.transform.localScale = Vector3.one * 0.03f;
+        dot.transform.SetParent(group.transform, true);
+        yield return Tween(0.7f, t =>
+        {
+            if (dot == null || group == null) return;
+            float k = Smooth(t);
+            dot.transform.position = arc(from(), to(), outward ? k : 1f - k);
+        });
+        Remove(dot);
     }
 
     // Several models as one stage, so a morph can take them all at once.
@@ -1152,7 +1274,10 @@ public class StoryDirector : MonoBehaviour
         var parts = Parts(go);
         if (parts.Length == 0) return go;
         Bounds b = GesturePlayer.GetBounds(parts);
-        go.transform.localScale *= Mathf.Min(TextHeight / b.size.y, TextWidth / b.size.x);
+        // One type size for every headline (a layout grid, not fill-the-box), smaller for the tracked department names;
+        // only a line too wide for the alcove is scaled down.
+        float typeSize = name.StartsWith("Dept_") ? 0.22f : 0.38f;
+        go.transform.localScale *= Mathf.Min(typeSize, TextWidth / b.size.x, TextHeight / b.size.y);
         b = GesturePlayer.GetBounds(parts);
         go.transform.position += new Vector3(center.x, center.y + TextY, center.z - TextForward) - b.center;
 

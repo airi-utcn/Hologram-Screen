@@ -8,12 +8,42 @@ ModelImporter:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
       name: Graphite
-    second: {fileID: 2100000, guid: 0512d473ab234849991140fb70fa9577, type: 2}
+    second: {fileID: 2100000, guid: 31f1925714d748f0bf92df529182d5bd, type: 2}
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
       name: UTCNRed
-    second: {fileID: 2100000, guid: cc0680f16823450c8dab899941989578, type: 2}
+    second: {fileID: 2100000, guid: 9bc52e203d444917a03ef6843d5ee80d, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Concrete
+    second: {fileID: 2100000, guid: ba9cebefee9f4f19bb670305639cf44c, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Leaf
+    second: {fileID: 2100000, guid: d3b1259181544e599d2087488daef925, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Fins
+    second: {fileID: 2100000, guid: 76df7d4c25804d7388c84800da32298d, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Solar
+    second: {fileID: 2100000, guid: c86e1d9c14994a338c99117e7798f647, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: PCB
+    second: {fileID: 2100000, guid: 1dfc2697c4474b4bbe98fada4f589d76, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Glass
+    second: {fileID: 2100000, guid: cb2e5c475d4b4be78f8f6c2b5e7aea0a, type: 2}
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
@@ -24,31 +54,6 @@ ModelImporter:
       assembly: UnityEngine.CoreModule
       name: TextSide
     second: {fileID: 2100000, guid: 14339cb2cf674a88b6bd591bdba95827, type: 2}
-  - first:
-      type: UnityEngine:Material
-      assembly: UnityEngine.CoreModule
-      name: Concrete
-    second: {fileID: 2100000, guid: 14339cb2cf674a88b6bd591bdba95827, type: 2}
-  - first:
-      type: UnityEngine:Material
-      assembly: UnityEngine.CoreModule
-      name: Glass
-    second: {fileID: 2100000, guid: cb2e5c475d4b4be78f8f6c2b5e7aea0a, type: 2}
-  - first:
-      type: UnityEngine:Material
-      assembly: UnityEngine.CoreModule
-      name: Leaf
-    second: {fileID: 2100000, guid: ccb3b129b81b40c6b9e404daeb078caa, type: 2}
-  - first:
-      type: UnityEngine:Material
-      assembly: UnityEngine.CoreModule
-      name: Fins
-    second: {fileID: 2100000, guid: 0013584b9c834ba6810163b2f8e803be, type: 2}
-  - first:
-      type: UnityEngine:Material
-      assembly: UnityEngine.CoreModule
-      name: Solar
-    second: {fileID: 2100000, guid: b16c2068c98649989d607dd7af981f7b, type: 2}
   materials:
     materialImportMode: 2
     materialName: 0

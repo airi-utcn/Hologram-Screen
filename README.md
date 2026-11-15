@@ -49,7 +49,7 @@ Press **H** in the app to show them on screen.
 
 | Key / gesture | Does |
 |---|---|
-| Enter | play the AIRI × UTCN spot (77 s) |
+| Enter | play the AIRI × UTCN spot (83 s) |
 | M | play the AI for health spot with the OCT retina (22 s) |
 | Esc | skip the story to its end (the logos) |
 | Tab | next experience: model showcase ↔ asteroid orbits (VQ1 / VN3) |
@@ -84,10 +84,10 @@ The app starts on the showcase as usual. Two spots (`StoryDirector.cs`) each hav
 - **One thread:** every image turns into the next through a swarm of particles that leaves one shape and gathers into the next, so the story flows instead of things popping in and out.
 - **Calm motion:** there's no pedestal and nothing moving in the background. One thing moves at a time, slowly, with eased starts and stops.
 - **Depth:** models float at eye height or stand on the alcove floor, and a key light from in front gives each one a floor shadow (the overhead spot is dimmed meanwhile).
-- **Headlines:** extruded bold 3D letters (Liberation Sans), faces in the UTCN grey and lighter sides, rising into place one after another.
-- **Colours:** nothing is white or light, because white is invisible on the HLD.
+- **Headlines:** slim extruded 3D letters in Montserrat (OFL, `SourceModels/Story/fonts`), faces in the UTCN grey with lighter sides and a fine bevel, rising into place one after another. Headlines are Bold, in sentence case without full stops, all at one type size; department names are SemiBold small capitals with wide letter spacing.
+- **Colours and textures:** the models carry realistic textures with normal maps (brushed metal, concrete, grass, a circuit board with traces and vias, plastic, painted metal, solar cells), generated with the models. Nothing is white or light, because white is invisible on the HLD.
 
-**1. AIRI × UTCN (77 s, Enter)**
+**1. AIRI × UTCN (83 s, Enter)**
 
 | Time | On the hologram | Headline |
 |---|---|---|
@@ -98,7 +98,8 @@ The app starts on the showcase as usual. Two spots (`StoryDirector.cs`) each hav
 | 22–29 s | The spark spirals into the heart and the two become the AIRI logo, standing on the floor | AT UTCN, THEY MEET. |
 | 29–38 s | The logo pours down into a lawn; the AIRI building assembles floor by floor; trees grow; the campus turns slowly to show the curve of its front | WELCOME TO AIRI. · THE AI RESEARCH INSTITUTE AT UTCN. |
 | 38–67 s | AIRI's departments and centres ([airi.utcluj.ro/research/departments](https://airi.utcluj.ro/research/departments)), 2.8 s each, each flowing into the next (see below) | the department's name |
-| 67–77 s | It all becomes the AIRI and UTCN logos, side by side on the floor | THE FUTURE STARTS HERE. · JOIN US. |
+| 67–73 s | 5G-SHARE ([project page](https://airi.utcluj.ro/research/projects/5g-scalable-hubs-for-accessible-and-resilient-education-5g-share)): a 5G mast (lattice, sector antennas, microwave dishes, aviation light) sends waves and data packets along arcs to four partner campuses labelled IE, RO, CZ, IT | 5G-SHARE. · 4 COUNTRIES. ONE 5G NETWORK. |
+| 73–83 s | It all becomes the AIRI and UTCN logos, side by side on the floor | THE FUTURE STARTS HERE. · JOIN US. |
 
 The departments, in order:
 
@@ -128,7 +129,7 @@ The AIRI building is modelled on the architects' render: seven storeys wrapped i
 
 **Changing them:**
 - **Timings:** the `At(...)` cues in `AiriSpot()` / `HealthSpot()` in `StoryDirector.cs`.
-- **3D assets:** the headlines, the AIRI building (`lab()`), the department models (board, robot arm, drone, car, padlock, satellite, balance, gauge, VR headset, labelling set, server rack), trees, lamps and lawn are made by `SourceModels/Story/make_story_assets.py` (edit `PHRASES` for the wording) and installed by `SourceModels/Story/install_story.py`, which also maps their materials onto the project's (light grey fins, blue-grey glass, navy solar panels, grass).
+- **3D assets:** the headlines, the AIRI building (`lab()`), the department models (board, robot arm, drone, car, padlock, satellite, balance, gauge, VR headset, labelling set, server rack), the 5G mast and campus hubs, trees, lamps, lawn and the textures (`textures()`) are made by `SourceModels/Story/make_story_assets.py` (edit `PHRASES` for the wording) and installed by `SourceModels/Story/install_story.py`, which also creates the textured HDRP materials (`Resources/Story/Materials/Story*.mat`, textures in `Resources/Story/Textures`) and maps the models' materials onto them.
 - **Rebuilding them:** a portable Blender 5.2.3 is in `C:/Users/Deea/hologram/tools` (outside the repo):
   ```bash
   blender -b --factory-startup -P SourceModels/Story/make_story_assets.py -- <out folder>
