@@ -49,6 +49,9 @@ Press **H** in the app to show them on screen.
 
 | Key / gesture | Does |
 |---|---|
+| Enter | play the AIRI × UTCN spot (77 s) |
+| M | play the AI for health spot with the OCT retina (22 s) |
+| Esc | skip the story to its end (the logos) |
 | Tab | next experience: model showcase ↔ asteroid orbits (VQ1 / VN3) |
 | ← / → | previous / next object |
 | Drag (finger or mouse) | turn (sideways) / tilt (up-down) |
@@ -72,6 +75,67 @@ Press **H** in the app to show them on screen.
 | Shift + PgUp / PgDn | zoom (saved) |
 | Shift + Backspace | reset the view alignment |
 | Ctrl + E | monitor menu |
+
+## The two spots: AIRI × UTCN and AI for health
+
+The app starts on the showcase as usual. Two spots (`StoryDirector.cs`) each have their own key: **Enter** plays the AIRI × UTCN spot, **M** the health spot. Pressing the key again restarts it, **Esc** skips to the end, and afterwards the showcase takes over again on the AIRI ↔ UTCN logo loop.
+
+**How they're staged:**
+- **One thread:** every image turns into the next through a swarm of particles that leaves one shape and gathers into the next, so the story flows instead of things popping in and out.
+- **Calm motion:** there's no pedestal and nothing moving in the background. One thing moves at a time, slowly, with eased starts and stops.
+- **Depth:** models float at eye height or stand on the alcove floor, and a key light from in front gives each one a floor shadow (the overhead spot is dimmed meanwhile).
+- **Headlines:** extruded bold 3D letters (Liberation Sans), faces in the UTCN grey and lighter sides, rising into place one after another.
+- **Colours:** nothing is white or light, because white is invisible on the HLD.
+
+**1. AIRI × UTCN (77 s, Enter)**
+
+| Time | On the hologram | Headline |
+|---|---|---|
+| 0–6 s | A red spark drifts in from deep in the alcove and comes to rest at eye height, breathing | EVERY REVOLUTION STARTS WITH A SPARK. |
+| 6–11 s | A neural network grows out of it and turns slowly; signals run along its links and light the neurons | IT LEARNS. |
+| 11–16 s | The neurons settle onto a globe as red city lights; the spark circles it once | IT CONNECTS THE WORLD. |
+| 16–22 s | The globe flows into a beating heart | BUT IT NEEDS A HUMAN HEART. |
+| 22–29 s | The spark spirals into the heart and the two become the AIRI logo, standing on the floor | AT UTCN, THEY MEET. |
+| 29–38 s | The logo pours down into a lawn; the AIRI building assembles floor by floor; trees grow; the campus turns slowly to show the curve of its front | WELCOME TO AIRI. · THE AI RESEARCH INSTITUTE AT UTCN. |
+| 38–67 s | AIRI's departments and centres ([airi.utcluj.ro/research/departments](https://airi.utcluj.ro/research/departments)), 2.8 s each, each flowing into the next (see below) | the department's name |
+| 67–77 s | It all becomes the AIRI and UTCN logos, side by side on the floor | THE FUTURE STARTS HERE. · JOIN US. |
+
+The departments, in order:
+
+| Headline | On the hologram |
+|---|---|
+| MICROELECTRONICS. | A real-looking AI board, tipped toward the viewer: processor under a finned heatsink, memory, an AI accelerator with a red die, capacitors, inductors, edge contacts, ports, a pin header, AIRI@UTCN printed on it; signals run out along its traces |
+| ROBOTICS & IOT. | A robot arm reaches down, grips a crate and lifts it |
+| AUTONOMOUS SYSTEMS. | An autonomous car turns on the spot, its lidar sending scan rings across the floor, a drone hovering above |
+| CYBERSECURITY & SPACE. | A padlock, a satellite circling it |
+| ROBOTICS FOR HEALTHCARE. | The OCT retina scan: a scan beam passes and the fluid pockets show and pulse |
+| TRUSTWORTHY AI. | A balance tips, swings and settles level |
+| AI MEASUREMENT. | A dial gauge's needle sweeps up while a bar chart grows |
+| IMMERSIVE EDUCATION. | A VR headset with virtual windows popping up and floating round it |
+| DATA LABELLING. | A sphere, a cube and a cone get red bounding boxes and label tags |
+| HPC-AI. | A server rack, its status LEDs flickering red |
+
+The AIRI building is modelled on the architects' render: seven storeys wrapped in dense light vertical fins, the front curving inward in the middle (around the old house, which is left out), a glazed ground floor set back behind the fins, and on the roof solar panels, a green terrace with hedges and a recessed plant floor.
+
+**2. AI for health (22 s, M)**, with the OCT retina scan (`W_I_OS`)
+
+| Time | On the hologram | Headline |
+|---|---|---|
+| 0–4 s | The retina scan grows in at eye height and turns slowly | AI FOR HEALTH. |
+| 4–10 s | A red scan beam passes through it; the fluid pockets (Cyst / IRF, SRF, PED) show and pulse | IT SEES WHAT WE MISS. |
+| 10–15 s | It keeps turning, the fluids pulsing | EARLY DETECTION. SAVED SIGHT. |
+| 15–22 s | It flows into the AIRI and UTCN logos, side by side on the floor | AIRI × UTCN |
+
+**Changing them:**
+- **Timings:** the `At(...)` cues in `AiriSpot()` / `HealthSpot()` in `StoryDirector.cs`.
+- **3D assets:** the headlines, the AIRI building (`lab()`), the department models (board, robot arm, drone, car, padlock, satellite, balance, gauge, VR headset, labelling set, server rack), trees, lamps and lawn are made by `SourceModels/Story/make_story_assets.py` (edit `PHRASES` for the wording) and installed by `SourceModels/Story/install_story.py`, which also maps their materials onto the project's (light grey fins, blue-grey glass, navy solar panels, grass).
+- **Rebuilding them:** a portable Blender 5.2.3 is in `C:/Users/Deea/hologram/tools` (outside the repo):
+  ```bash
+  blender -b --factory-startup -P SourceModels/Story/make_story_assets.py -- <out folder>
+  ```
+  ```bash
+  python SourceModels/Story/install_story.py <out folder> .
+  ```
 
 ## Saving each object's look
 

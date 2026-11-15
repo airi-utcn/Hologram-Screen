@@ -50,6 +50,9 @@ public class DisplayAlignment : MonoBehaviour
 
     private const string Help =
         "CONTROLS  (H hides this)\n\n" +
+        "Enter        AIRI x UTCN spot\n" +
+        "M            AI for health spot (OCT retina)\n" +
+        "Esc          skip to its end\n" +
         "<- / ->      switch object\n" +
         "Tab          next experience (asteroids)\n" +
         "Drag         rotate   (1 finger / mouse)\n" +
@@ -169,6 +172,8 @@ public class DisplayAlignment : MonoBehaviour
         PlayerPrefs.Save();
         Show($"Scene offset {-offsetY:+0.00;-0.00;0}   Zoom {(baseFov / (baseFov + fovDelta)):0.00}x");
     }
+
+    public bool HelpVisible { set => showHelp = value; }
 
     public void Show(string text)
     {

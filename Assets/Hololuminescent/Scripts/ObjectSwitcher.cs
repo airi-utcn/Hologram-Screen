@@ -50,6 +50,18 @@ public class ObjectSwitcher : MonoBehaviour
     private int current;
     private int first;
 
+    // For StoryDirector: where objects stand, and taking the stage over.
+    public Vector3 Spot { get; private set; }
+    public void HideAll() { foreach (var o in objects ?? new GameObject[0]) if (o != null) o.SetActive(false); }
+    public void ShowFirst() => Show(first);
+    public GameObject ShowNamed(string part)
+    {
+        int i = System.Array.FindIndex(objects ?? new GameObject[0], o => o != null && o.name.Contains(part));
+        if (i < 0) return null;
+        Show(i);
+        return objects[i];
+    }
+
     // Awake runs before any Start, so the first object is still at its placed spot.
     private void Awake()
     {
@@ -57,6 +69,7 @@ public class ObjectSwitcher : MonoBehaviour
 
         var list = new List<GameObject>(objects ?? new GameObject[0]);
         Vector3 spot = list.Count > 0 && list[0] != null ? list[0].transform.position : transform.position;
+        Spot = spot;
         bool reveal = !string.IsNullOrEmpty(revealFront) && System.Array.IndexOf(resourceModels, revealFront) >= 0
                       && System.Array.IndexOf(resourceModels, revealBack) >= 0;
         bool duet = !string.IsNullOrEmpty(duetFirst) && System.Array.IndexOf(resourceModels, duetFirst) >= 0
