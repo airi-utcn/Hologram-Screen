@@ -53,7 +53,7 @@ public class DisplayAlignment : MonoBehaviour
         "Enter        AIRI x UTCN spot\n" +
         "M            AI for health spot (OCT retina)\n" +
         "Esc          skip to its end\n" +
-        "L            AIRI exhibit: opening + research\n" +
+        "L            Wake the Lab: touch game\n" +
         "             (or hold 4 fingers still 2 s)\n" +
         "             N next step, wheel = spread\n" +
         "<- / ->      switch object\n" +

@@ -52,7 +52,7 @@ Press **H** in the app to show them on screen.
 | Enter | play the AIRI × UTCN spot (83 s) |
 | M | play the AI for health spot with the OCT retina (22 s) |
 | Esc | skip the story to its end (the logos) |
-| L, or 4 fingers held still for 2 s | start or leave the AIRI exhibit (opening, then research by touch) |
+| L, or 4 fingers held still for 2 s | start or leave Wake the Lab, the touch game |
 | Tab | next experience: model showcase ↔ asteroid orbits (VQ1 / VN3) |
 | ← / → | previous / next object |
 | Drag (finger or mouse) | turn (sideways) / tilt (up-down) |
@@ -165,28 +165,36 @@ blender -b --factory-startup -P SourceModels/Story/hld_video.py -- "<recording.m
 
 In HLD Author: **Videos → Import**, then **Export** for the display (HLD 27" / 86" for the Demo Media Player, or General / BrightSign). Its **Shadow** setting can add a grounding shadow too. The crop and scale values in the script were measured for a 1920 × 1080 recording with the app's picture in the middle; re-measure them for a recording of another size. If the recording opens on black (it would show as a black box on the HLD), add `--start <first frame with picture>`.
 
-## The AIRI exhibit: opening and research, by touch
+## Wake the Lab: the touch game (playful version)
 
-Press **L**, or hold **four fingers still for 2 seconds**, to start it or leave it (Esc leaves too). It is built at runtime by `Assets/Hololuminescent/Scripts/HoloLab.cs` from the showcase's models and the story's department models. Its 3D headlines and labels (`Lab_*`, `Hint_*`, `Label_*`, `Title_*`) come from `make_story_assets.py`.
+> This branch keeps the playful version. The official exhibit (red carpet, research carousel) is on `airi-exhibit-official`.
 
-**The official opening** is also the resting state. It shows the AIRI building on its lawn with trees and lamps, and a red ribbon between two posts before the door: *Official opening*. A **swipe across the ribbon** cuts it:
-1. The halves swing down from the posts, the bow drops and confetti falls.
-2. **The red carpet rolls out** from the door toward the guests.
-3. *Welcome to AIRI* appears; a tap (or 12 s) moves on.
+Press **L**, or hold **four fingers still for 2 seconds**, to start it or leave it (Esc leaves too). It is built at runtime by `Assets/Hololuminescent/Scripts/HoloLab.cs` from the showcase's models and the story's department models. Its 3D headlines (`Lab_*`, `Hint_*`) come from `make_story_assets.py`.
 
-**Explore AIRI research** is a carousel of seven research areas. **Swipe** to turn it; a flick keeps it going and it settles on one. Its name shows under the front exhibit, and a **tap** opens it. Every exhibit has **BACK** at the bottom. After a demonstration finishes, *Demonstration complete* shows and the carousel returns.
+**The opening** comes first, and its first step is also the resting state:
+- *Raise the institute*: every tap raises the next storey of the AIRI building, and several fingers raise several.
+- *Cut the ribbon*: swipe across the red ribbon. The halves swing down, the bow drops and confetti rains.
+- *Welcome to AIRI*: every tap throws more confetti. The menu follows 6 s after the last touch.
 
-| Exhibit | By touch |
-|---|---|
-| **AI for health** | The heart. Drag to turn it, spread two fingers to open it, tap a part to name it: valves (once open), heart wall, coronary vessels. |
-| **Robotics & IoT** | Drag sideways to turn the arm and down to lower it. It grips the crate when the hand reaches it; set the crate on the red pad. |
-| **Autonomous systems** | Draw a flight path with one finger; the drone flies it. |
-| **Cybersecurity** | Traffic flows to the padlock. Tap the red packets to intercept them and leave the graphite (legitimate) traffic alone; twelve fill the shield. |
-| **5G-SHARE** | Drag from the mast to each of the four campuses; data then runs along the links. |
-| **Digital twins** | The turbine. Circle the fan to run it up (the bar shows the run-up; hold it in the red for 3 s). Drag elsewhere to turn it and tap a part to name it. |
-| **Our guests** | *Where are you from?* Spin the globe and tap your home to drop a pin. Pins are **kept from guest to guest** (PlayerPrefs `HLD_LabPins`, the last 200). |
+**The menu:** *Choose your lab*. Tap the left half for **Play the lab** or the right half for **AIRI Research**. Each path has five challenges with five progress dots and returns to the menu at the end.
 
-An exhibit goes back to the carousel after 30 s without a touch, and the carousel goes back to the opening after 40 s. With a mouse (no touch screen), the wheel stands in for spreading two fingers, and **N** skips to the next step.
+**Play the lab**
+1. **Heart:** tap with the beat (the bead ring swells on it); ten good taps restart it, each drawing a beat on the ECG. Spread two fingers to open it.
+2. **Engine:** draw circles around the fan, and hold the gauge in the red for 3 s.
+3. **Orbit:** flick the three moons round the planet; several fingers can throw at once.
+4. **Stallion:** swipe fast until it gallops, and hold the gallop for 4 s.
+5. **Globe:** *Where are you from?* Tap your home to drop a pin; pins are kept between runs (PlayerPrefs `HLD_LabPins`).
+6. **The core:** its five faces are lit. Drag to spin it and spread two fingers to open it.
+
+**AIRI Research**
+1. **Robotics & IoT:** drag to turn and lower the arm, grip the box and put it on the red pad.
+2. **Autonomous systems:** fly the drone through the three rings.
+3. **Data labelling:** tap each object to snap its bounding box and label on.
+4. **Cybersecurity & space:** tap the red attacks before they reach the padlock.
+5. **5G-SHARE:** drag from the mast to each campus to link them.
+6. **Join us:** the AIRI and UTCN logos, with confetti on every tap.
+
+With no touch for 40 s, the game goes back to the opening. With a mouse (no touch screen), the wheel stands in for spreading two fingers, and **N** skips to the next step.
 
 ## Saving each object's look
 

@@ -6,27 +6,24 @@ using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 
 /// <summary>
-/// The AIRI exhibit for the HLD: an official opening, then the institute's research to explore by touch. Built at runtime
-/// from the showcase's models, the story's department models and the 3D headlines (SourceModels/Story/
-/// make_story_assets.py: Lab_*, Hint_*, Label_*). L, or four fingers held still for 2 s, starts or leaves it; README.md
-/// ("The AIRI exhibit") walks through it.
+/// Wake the Lab: a touch game for the HLD, built at runtime from the showcase's models, the story's department models and
+/// the 3D headlines (SourceModels/Story/make_story_assets.py, Lab_* and Hint_*). L, or four fingers held still for 2 s,
+/// starts or leaves it. README.md, "Wake the Lab", walks through every step.
 ///
-/// Opening (also the resting state): the AIRI building, a red ribbon before the door. A swipe across cuts it: the halves
-/// swing down, confetti falls, the red carpet rolls out toward the guests, "Welcome to AIRI".
-/// Carousel: swipe to browse the research areas, tap to open one. In every exhibit BACK (bottom) returns.
-///  AI for health      the heart: drag to turn, spread to open, tap a part to name it (valves, wall, vessels)
-///  Robotics & IoT     steer the arm (drag), grip the crate, set it on the pad
-///  Autonomous systems draw a flight path; the drone flies it
-///  Cybersecurity      tap the red packets before they reach the lock; leave the legitimate traffic alone
-///  5G-SHARE           drag from the mast to each campus; data runs along the links
-///  Digital twins      the turbine: circle the fan to run it up, drag to turn, tap a part to name it
-///  Our guests         spin the globe, tap your home: a pin, kept from guest to guest
+/// The opening (also the resting state): tap to raise the AIRI building storey by storey, swipe across the ribbon to cut
+/// it, confetti and "Welcome to AIRI". Then the menu: Play the lab (left) or AIRI Research (right), five challenges each,
+/// one progress dot each, back to the menu at the end. 40 s without a touch: back to the opening.
+///  Play:     heart (tap with the beat), engine (circle the fan), orbit (flick the moons), stallion (swipe to gallop),
+///            globe (tap your home; pins kept between visitors), then the lit core.
+///  Research: robotics (drag the arm, box onto the pad), autonomous (fly the drone through rings), data labelling (tap to
+///            label), cybersecurity (tap the red attacks), 5G-SHARE (drag links from the mast), then AIRI x UTCN, join us.
 /// </summary>
 public class HoloLab : MonoBehaviour
 {
     // Same frame as the spots (StoryDirector): heights above the stage, which is Lift above the alcove floor.
     private const float Lift = 1.0f, Mid = 1.25f, TextY = 2.95f, HintY = 2.3f, TextWidth = 2.1f, TextForward = 0.6f;
-    private const float IdleSeconds = 40f, ExhibitIdleSeconds = 30f;
+    private const float DotsY = 0.12f;
+    private const float IdleSeconds = 40f, EndIdleSeconds = 20f;
 
     private ObjectSwitcher switcher;
     private DisplayAlignment display;
@@ -39,6 +36,7 @@ public class HoloLab : MonoBehaviour
     private Camera cam;
     private Vector3 center;
     private Material dark, red, light;
+    private int lit;
     private float lastTouch, holdFour;
 
     private readonly List<GameObject> spawned = new List<GameObject>();
@@ -191,7 +189,6 @@ public class HoloLab : MonoBehaviour
         if (display != null) { display.HelpVisible = false; swayWas = display.Sway; display.Sway = false; }
         Measure();
         AddKeyLight();
-        AddGrade();
         var ledge = GameObject.Find("Ledge");
         ledgeLook = ledge != null ? ledge.GetComponent<Renderer>() : null;
         if (ledgeLook != null) ledgeLook.enabled = false;
@@ -205,7 +202,6 @@ public class HoloLab : MonoBehaviour
     private void Leave(bool showcase)
     {
         StopAllCoroutines();
-        FiveGLogo.Show(false);
         Clear();
         if (keyLight != null)
         {
@@ -213,8 +209,6 @@ public class HoloLab : MonoBehaviour
             Destroy(keyLight);
         }
         keyLight = null;
-        if (grade != null) Destroy(grade);
-        grade = null;
         if (ledgeLook != null) ledgeLook.enabled = true;
         if (floorLook != null) floorLook.enabled = true;
         ledgeLook = floorLook = null;
@@ -252,62 +246,66 @@ public class HoloLab : MonoBehaviour
         alcoveSpot.intensity = alcoveSpotIntensity * 0.3f;
     }
 
-    // Livelier colours while the exhibit runs: the alcove's grade left the models looking washed out. Only saturation and
-    // contrast; white stays white (contrast only pushes it further up).
-    private GameObject grade;
+    // ---------------------------------------------------------------- the game
 
-    private void AddGrade()
-    {
-        grade = new GameObject("Lab Grade");
-        var volume = grade.AddComponent<UnityEngine.Rendering.Volume>();
-        volume.isGlobal = true;
-        volume.priority = 100f;
-        var profile = ScriptableObject.CreateInstance<UnityEngine.Rendering.VolumeProfile>();
-        var colour = profile.Add<UnityEngine.Rendering.HighDefinition.ColorAdjustments>(true);
-        colour.saturation.Override(35f);
-        colour.contrast.Override(12f);
-        volume.sharedProfile = profile;
-    }
-
-    // ---------------------------------------------------------------- the exhibit
-
-    // The opening is also the resting state; then the research carousel and, from it, the exhibits. 40 s without a touch
-    // in the carousel starts over from the opening; an exhibit goes back to the carousel after 30 s without one.
+    // The opening (raise the institute, cut the ribbon) is also the resting state; then the menu and its two paths,
+    // back to the menu after each; 40 s without a touch anywhere starts over from the opening.
     private IEnumerator Loop()
     {
         timedOut = false;
-        yield return Opening();
-        int at = 0;
+        yield return Ceremony();
         while (!timedOut)
         {
-            int pick = -1;
-            yield return Explore(at, i => pick = i);
-            if (timedOut || pick < 0) break;
-            at = pick;
-            lastTouch = Time.time;
-            yield return Exhibits[pick].open();
-            Clear();
+            bool research = false;
+            yield return Menu(r => research = r);
+            if (timedOut) break;
+            yield return research ? ResearchPath() : PlayPath();
         }
-        StopAllCoroutines();   // carpet, confetti; this one ends at the yield below
+        StopAllCoroutines();   // dots, bursts; this one ends at the yield below
         Clear();
         StartCoroutine(Loop());
     }
 
-    // The carousel's exhibits: model, its size there, its name under it, and the exhibit it opens.
-    private (string model, float height, string label, Func<IEnumerator> open)[] Exhibits => new (string, float, string, Func<IEnumerator>)[]
+    private IEnumerator PlayPath()
     {
-        ("Models/HumanHeart/HumanHeart", 0.8f, "Label_Health", HealthExhibit),
-        ("Story/RobotArm", 0.95f, "Label_Robotics", ArmExhibit),
-        ("Story/Drone", 0.4f, "Label_Autonomous", DroneExhibit),
-        ("Story/Padlock", 0.8f, "Label_Cyber", CyberExhibit),
-        ("Story/Tower5G", 1.0f, "Label_5G", FiveGExhibit),
-        ("Models/Engine/source/engine_sk", 0.6f, "Label_Turbine", TurbineExhibit),
-        ("Models/Globe/Atlas", 0.8f, "Label_Guests", GuestsExhibit),
-    };
+        var dots = Dots();
+        foreach (var station in new Func<IEnumerator>[] { HeartStation, EngineStation, OrbitStation, HorseStation, GlobeStation })
+        {
+            yield return station();
+            if (timedOut) break;
+            lit++;
+        }
+        if (!timedOut) yield return Finale();
+        StopCoroutine(dots);
+        Clear();
+    }
 
-    private readonly HashSet<GameObject> keep = new HashSet<GameObject>();
+    private IEnumerator ResearchPath()
+    {
+        var dots = Dots();
+        foreach (var station in new Func<IEnumerator>[] { ArmStation, DroneStation, LabelStation, CyberStation, FiveGStation })
+        {
+            yield return station();
+            if (timedOut) break;
+            lit++;
+        }
+        if (!timedOut) yield return ResearchEnd();
+        StopCoroutine(dots);
+        Clear();
+    }
 
-    // N: on to the next step (for trying the exhibit out).
+    // Five progress dots at the bottom, the current one pulsing.
+    private Coroutine Dots()
+    {
+        lit = 0;
+        var dots = Row(new Vector3(-0.44f, DotsY, 0f), new Vector3(0.44f, DotsY, 0f), 5, 0.075f);
+        foreach (var d in dots) keep.Add(d.gameObject);
+        return StartCoroutine(PulseDots(dots));
+    }
+
+    private readonly HashSet<GameObject> keep = new HashSet<GameObject>();   // what stays from station to station
+
+    // N: on to the next station (for trying the game out).
     private bool skip;
     private bool TakeSkip() { bool s = skip; skip = false; return s; }
 
@@ -318,807 +316,509 @@ public class HoloLab : MonoBehaviour
         return true;
     }
 
-    // ------------------------------------------------ the official opening: cut the ribbon, the red carpet rolls out
-
-    private IEnumerator Opening()
+    private IEnumerator PulseDots(List<Renderer> dots)
     {
-        confettiMade = 0;
-        var plaza = Load("Story/Plaza");
-        plaza.transform.localScale *= 1.15f;
-        plaza.transform.position = center + Vector3.up * 0.078f;
-        var lab = Model("Story/AIRI_Lab", 2.0f, 2.2f, 0.078f);
-        lab.transform.position += Vector3.forward * 0.3f;
-        foreach (var (x, z, s) in new[] { (-0.9f, -0.45f, 0.85f), (0.88f, -0.55f, 0.8f), (-0.6f, -0.85f, 0.7f), (0.62f, -0.9f, 0.75f),
-                                          (-1.02f, 0.15f, 0.8f), (1.02f, 0.05f, 0.85f) })
+        while (true)
         {
-            var tree = Model("Story/Tree", 0.6f * s, 1f, 0.078f);
-            tree.transform.position += new Vector3(x, 0f, z);
-        }
-        foreach (float x in new[] { -0.52f, 0.52f })   // lamps either side of the carpet and its stanchions
-        {
-            var lamp = Model("Story/Lamp", 0.38f, 1f, 0.078f);
-            lamp.transform.position += new Vector3(x, 0f, -0.75f);
-            if (x > 0f) lamp.transform.RotateAround(Middle(lamp), Vector3.up, 180f);
-        }
-
-        // The ribbon: between two posts in front of the door, fluttering a little.
-        float groundY = center.y + 0.078f, tieY = groundY + 0.5f, z0 = center.z - 0.55f, half = 0.78f;
-        foreach (float x in new[] { -half - 0.02f, half + 0.02f })
-        {
-            var post = Prim(PrimitiveType.Cylinder, "Post", dark);
-            post.transform.localScale = new Vector3(0.035f, (tieY - groundY + 0.04f) * 0.5f, 0.035f);
-            post.transform.position = new Vector3(center.x + x, (groundY + tieY + 0.04f) * 0.5f, z0);
-            var top = Prim(PrimitiveType.Sphere, "Post top", red);
-            top.transform.localScale = Vector3.one * 0.06f;
-            top.transform.position = new Vector3(center.x + x, tieY + 0.05f, z0);
-        }
-        const int pieces = 28;
-        float length = 2f * half / pieces;
-        var ribbon = new List<Transform>();
-        for (int i = 0; i < pieces; i++)
-        {
-            var seg = Prim(PrimitiveType.Cube, "Ribbon", red);
-            seg.transform.localScale = new Vector3(length * 1.08f, 0.07f, 0.006f);
-            ribbon.Add(seg.transform);
-        }
-        var bow = new List<Transform>();
-        foreach (float a in new[] { 35f, -35f, 0f })
-        {
-            var loop = Prim(PrimitiveType.Sphere, "Bow", red);
-            loop.transform.localScale = a == 0f ? new Vector3(0.06f, 0.06f, 0.04f) : new Vector3(0.16f, 0.07f, 0.025f);
-            loop.transform.rotation = Quaternion.Euler(0f, 0f, a);
-            bow.Add(loop.transform);
-        }
-        Vector3 Point(float s, float wave) =>
-            new Vector3(center.x - half + 2f * half * s, tieY - 0.07f * (1f - (2f * s - 1f) * (2f * s - 1f)) + wave, z0);
-        void Lay(float time)
-        {
-            for (int i = 0; i < pieces; i++)
+            for (int i = 0; i < dots.Count; i++)
             {
-                if (ribbon[i] == null) continue;
-                Vector3 a = Point(i / (float)pieces, Mathf.Sin(time * 3f + i * 0.5f) * 0.006f);
-                Vector3 b = Point((i + 1f) / pieces, Mathf.Sin(time * 3f + (i + 1) * 0.5f) * 0.006f);
-                ribbon[i].position = (a + b) * 0.5f;
-                ribbon[i].rotation = Quaternion.FromToRotation(Vector3.right, b - a);
-            }
-            for (int i = 0; i < bow.Count; i++)
-                if (bow[i] != null) bow[i].position = Point(0.5f, 0f) + new Vector3((i == 0 ? -1 : i == 1 ? 1 : 0) * 0.07f, 0f, -0.02f);
-        }
-
-        var title = Text("Lab_Opening", TextY);
-        var hint = Text("Hint_Cut", HintY, true);
-        int cut = -1;
-        while (cut < 0)   // waits for its first guest, however long
-        {
-            if (TakeSkip()) cut = pieces / 2;
-            Lay(Time.time);
-            foreach (var f in fingers)
-            {
-                if (f.began || f.delta.magnitude < Screen.height * 0.008f) continue;   // a swipe, not a touch
-                Vector2 a = f.pos - f.delta, b = f.pos;
-                for (int i = 0; i < pieces && cut < 0; i++)
-                {
-                    Vector2 p = cam.WorldToScreenPoint(ribbon[i].position - ribbon[i].right * length * 0.5f);
-                    Vector2 q = cam.WorldToScreenPoint(ribbon[i].position + ribbon[i].right * length * 0.5f);
-                    if (Crosses(a, b, p, q)) cut = i;
-                }
+                if (dots[i] == null) continue;
+                dots[i].sharedMaterial = i < lit ? red : i == lit ? dark : light;
+                float s = i == lit ? 1f + 0.25f * Mathf.Sin(Time.time * 6f) : 1f;
+                dots[i].transform.localScale = Vector3.one * 0.075f * s;
             }
             yield return null;
         }
-
-        // Cut: the halves swing down from their posts, the bow drops, confetti falls and the red carpet rolls out
-        // from the door toward the guests.
-        Kill(ribbon[cut].gameObject);
-        TextOut(title);
-        TextOut(hint);
-        StartCoroutine(Confetti(Vector3.zero, 160, true));
-        StartCoroutine(Fall(bow, groundY));
-        StartCoroutine(Hang(ribbon, 0, cut, new Vector3(center.x - half, tieY, z0), 1f, length, groundY + 0.012f));
-        StartCoroutine(Hang(ribbon, cut + 1, pieces, new Vector3(center.x + half, tieY, z0), -1f, length, groundY + 0.012f));
-        var door = FindPart(lab.transform, "Door");
-        var doorLook = door != null ? door.GetComponent<Renderer>() : null;
-        float doorX = doorLook != null ? doorLook.bounds.center.x : center.x;
-        float doorZ = doorLook != null ? doorLook.bounds.min.z : center.z - 0.1f;
-        yield return new WaitForSeconds(0.5f);
-        var path = FindPart(plaza.transform, "Path");   // the concrete path stands above the lawn: lay the carpet on it
-        var pathLook = path != null ? path.GetComponent<Renderer>() : null;
-        float carpetY = pathLook != null ? pathLook.bounds.max.y + 0.002f : groundY + 0.016f;
-        float carpetWidth = pathLook != null ? pathLook.bounds.size.x - 0.03f : 0.3f;
-        // As wide as the path, and short of the curved wall, which starts at the path's edge near the front
-        // (make_story_assets.py plaza(): radius 0.7 round (0, -0.15), from -80 degrees; about 0.92 out at this scale).
-        StartCoroutine(Carpet(doorX, carpetY, doorZ, center.z - 0.86f, carpetWidth));
-        yield return new WaitForSeconds(2.6f);   // the carpet out and its stanchions up
-
-        var welcome = Text("Phrase_Welcome", TextY);
-        hint = Text("Hint_Begin", HintY, true);
-        lastTouch = Time.time;
-        float since = Time.time;
-        bool go = false;
-        while (!go && Time.time - since < 12f)
-        {
-            foreach (var f in fingers)
-                if (f.ended && Time.time - f.since < 0.5f && (f.pos - f.start).magnitude < Screen.height * 0.05f) go = true;
-            if (TakeSkip()) go = true;
-            yield return null;
-        }
-        TextOut(welcome);
-        TextOut(hint);
-        yield return ShrinkAll(0.6f);
     }
 
-    // The red carpet unrolls from (x, zFrom) toward zTo: a roll that shrinks as it goes, the cloth and its graphite
-    // edges growing behind it. The display sees the stage almost from the side, where a flat carpet is a thin line, so
-    // it is a thick runner, and stanchions with red ropes rise along both sides once it is out.
-    private IEnumerator Carpet(float x, float y, float zFrom, float zTo, float width)
+    // ------------------------------------------------ 1 heart: tap with the beat
+
+    private IEnumerator HeartStation()
     {
-        float full = zFrom - zTo;
-        const float thick = 0.024f;
-        var cloth = Prim(PrimitiveType.Cube, "Carpet", red);
-        var edges = new[] { Prim(PrimitiveType.Cube, "Carpet edge", dark), Prim(PrimitiveType.Cube, "Carpet edge", dark) };
-        var roll = Prim(PrimitiveType.Cylinder, "Carpet roll", red);
-        const float seconds = 1.8f;
-        for (float t = 0f; t <= seconds; t += Time.deltaTime)
-        {
-            float k = Smooth(Mathf.Clamp01(t / seconds)), len = Mathf.Max(0.001f, full * k);
-            cloth.transform.localScale = new Vector3(width, thick, len);
-            cloth.transform.position = new Vector3(x, y + thick * 0.5f, zFrom - len * 0.5f);
-            for (int i = 0; i < 2; i++)
-            {
-                edges[i].transform.localScale = new Vector3(0.02f, thick + 0.008f, len);
-                edges[i].transform.position = new Vector3(x + (i == 0 ? -1f : 1f) * (width * 0.5f + 0.01f), y + (thick + 0.008f) * 0.5f, zFrom - len * 0.5f);
-            }
-            float r = Mathf.Lerp(0.07f, 0.014f, k);   // what is left on the roll
-            roll.transform.localScale = new Vector3(2f * r, width * 0.5f, 2f * r);
-            roll.transform.position = new Vector3(x, y + r, zFrom - len);
-            roll.transform.rotation = Quaternion.AngleAxis(-len / Mathf.Max(r, 0.01f) * Mathf.Rad2Deg, Vector3.right) * Quaternion.Euler(0f, 0f, 90f);
-            yield return null;
-        }
-        Kill(roll);
+        var heart = Model("Models/HumanHeart/HumanHeart", 1.3f, 1.5f, 0.62f);
+        var pivot = Pivot(heart);
+        Vector3 mid = pivot.position;
+        var open = Opener(heart, mid, 0.35f, 0.9f);
+        var title = Text("Lab_Heart", TextY);
+        var hint = Text("Hint_Heart", HintY, true);
+        var ring = Arc(mid, 0.95f, 36, 0.045f, 90f, 360f);
+        var ecg = new Ecg(this, new Vector3(center.x, center.y + 0.36f, center.z - 0.35f), 2.0f);
 
-        // Stanchions rise one pair after another from the door outward, then the ropes hang between them.
-        const int perSide = 3;
-        const float postHeight = 0.2f;
-        var tops = new Vector3[2, perSide];
-        for (int j = 0; j < perSide; j++)
-        {
-            float z = Mathf.Lerp(zFrom - 0.08f, zTo + 0.06f, j / (perSide - 1f));
-            for (int i = 0; i < 2; i++)
-            {
-                float px = x + (i == 0 ? -1f : 1f) * (width * 0.5f + 0.06f);
-                var post = Prim(PrimitiveType.Cylinder, "Stanchion", dark);
-                var cap = Prim(PrimitiveType.Sphere, "Stanchion top", light);
-                var foot = Prim(PrimitiveType.Cylinder, "Stanchion foot", dark);
-                tops[i, j] = new Vector3(px, y + postHeight, z);
-                Transform pt = post.transform, ct = cap.transform, ft = foot.transform;
-                StartCoroutine(Tween(0.35f, k =>
-                {
-                    float h = postHeight * EaseOutBack(k);
-                    if (pt != null) { pt.localScale = new Vector3(0.022f, Mathf.Max(0.001f, h * 0.5f), 0.022f); pt.position = new Vector3(px, y + h * 0.5f, z); }
-                    if (ct != null) { ct.localScale = Vector3.one * 0.04f * Mathf.Max(0.02f, k); ct.position = new Vector3(px, y + h + 0.01f, z); }
-                    if (ft != null) { ft.localScale = new Vector3(0.06f, 0.006f, 0.06f); ft.position = new Vector3(px, y + 0.006f, z); }
-                }));
-            }
-            yield return new WaitForSeconds(0.15f);
-        }
-        yield return new WaitForSeconds(0.25f);
-        for (int i = 0; i < 2; i++)
-            for (int j = 0; j + 1 < perSide; j++)
-            {
-                var rope = Line(red, 0.014f);
-                rope.positionCount = 12;
-                Vector3 a = tops[i, j] + Vector3.down * 0.015f, b = tops[i, j + 1] + Vector3.down * 0.015f;
-                StartCoroutine(Tween(0.4f, k =>
-                {
-                    if (rope == null) return;
-                    for (int q = 0; q < 12; q++)
-                    {
-                        float u = q / 11f;
-                        rope.SetPosition(q, Vector3.Lerp(a, b, u) + Vector3.down * 0.05f * EaseOutBack(k) * 4f * u * (1f - u));
-                    }
-                }));
-            }
-    }
-
-    // ------------------------------------------------ the research carousel
-
-    // A cover flow: the exhibit in front large and turning on its plinth, its neighbours smaller, set back and turned
-    // toward it, the rest out of sight; beads under it say where you are. Swipe to browse (a flick runs on and settles),
-    // tap to open the one in front.
-    private IEnumerator Explore(int start, Action<int> chosen)
-    {
-        var list = Exhibits;
-        int n = list.Length;
-        var title = Text("Lab_Explore", TextY);
-        var hint = Text("Hint_Browse", HintY, true);
-        var pivots = new List<Transform>();
-        var halfHeight = new List<float>();
-        var plinths = new List<Transform>();
-        foreach (var e in list)
-        {
-            var model = Model(e.model, e.height, 0.85f, 0f);
-            halfHeight.Add(GesturePlayer.GetBounds(Parts(model)).extents.y);
-            pivots.Add(Pivot(model));
-            var plinth = Prim(PrimitiveType.Cylinder, "Plinth", dark).transform;
-            plinth.localScale = new Vector3(0.62f, 0.02f, 0.62f);
-            var rim = Prim(PrimitiveType.Cylinder, "Plinth rim", red).transform;
-            rim.SetParent(plinth, false);
-            rim.localScale = new Vector3(1.04f, 0.5f, 1.04f);
-            rim.localPosition = Vector3.down * 0.6f;
-            plinths.Add(plinth);
-        }
-        var beads = Row(new Vector3(-0.3f, 0.3f, 0f), new Vector3(0.3f, 0.3f, 0f), n, 0.05f);
-
-        float offset = start, velocity = 0f;   // in exhibits; the one in front is round(offset)
-        int front = -1, pick = -1;
-        GameObject label = null;
-        lastTouch = Time.time;
-        while (pick < 0)
+        const float period = 0.6f, latency = 0.05f;   // 100 bpm; the touch reaches the app a little late
+        const int need = 10;
+        wheelOpen = 0f;
+        float t0 = Time.time, squeeze = 0f, wobble = 0f, explode = 0f, pinch0 = -1f;
+        int hits = 0;
+        bool hintSwapped = false;
+        while (hits < need)
         {
             if (Idle()) { Clear(); yield break; }
-            float dt = Mathf.Max(Time.deltaTime, 1e-4f);
-            if (TakeSkip()) pick = Mod(Mathf.RoundToInt(offset), n);
-            if (Held() == 1 && !fingers[0].began)
-            {
-                float d = -fingers[0].delta.x / Screen.width * 2.2f;   // a full-width swipe moves about two exhibits
-                offset += d;
-                velocity = Mathf.Lerp(velocity, d / dt, 0.4f);
-            }
-            else
-            {
-                offset += velocity * dt;
-                velocity = Mathf.Lerp(velocity, 0f, dt * 4f);
-                if (Mathf.Abs(velocity) < 0.6f) offset = Mathf.Lerp(offset, Mathf.Round(offset), dt * 7f);   // settles on one
-            }
-            foreach (var f in fingers)
-                if (f.ended && Time.time - f.since < 0.4f && (f.pos - f.start).magnitude < Screen.height * 0.03f)
-                    pick = Mod(Mathf.RoundToInt(offset), n);
+            if (TakeSkip()) break;
+            float dt = Time.deltaTime, phase = (Time.time - t0) % period;
+            float cue = Mathf.Exp(-phase * 9f);
+            Swell(ring, 1f + 0.7f * cue);   // the beat to tap with: the ring swells, the heart twitches a little
 
-            for (int i = 0; i < n; i++)
+            if (Held() <= 1)
+                foreach (var f in fingers)
+                {
+                    if (!f.began) continue;
+                    float p = (Time.time - latency - t0) % period, err = Mathf.Min(p, period - p);
+                    // a miss only shakes it: losing progress made it feel stuck
+                    if (err < 0.2f) { hits++; squeeze = 1f; ecg.Beat(1f); }
+                    else { wobble = 1f; ecg.Beat(0.2f); }
+                    Fill(ring, hits / (float)need);
+                }
+
+            float target = Spread(ref pinch0);
+            explode = Mathf.MoveTowards(explode, target, dt * 2.5f);
+            open(explode);
+
+            squeeze = Mathf.MoveTowards(squeeze, 0f, dt * 5f);
+            wobble = Mathf.MoveTowards(wobble, 0f, dt * 3f);
+            pivot.localScale = Vector3.one * (1f - 0.13f * squeeze - 0.03f * cue * (1f - squeeze));
+            pivot.localRotation = Quaternion.Euler(0f, Mathf.Sin(Time.time * 45f) * 7f * wobble, 0f);
+            ecg.Tick(dt);
+
+            if (!hintSwapped && hits >= 5)
             {
-                float d = Mathf.Repeat(i - offset + n * 0.5f, n) - n * 0.5f;   // signed place from the front, wrapping round
-                float side = Mathf.Clamp(d, -1.6f, 1.6f), away = Mathf.Abs(side);
-                float scale = Mathf.Lerp(1.15f, 0.55f, Mathf.Clamp01(away)) * Mathf.Clamp01(1.6f - Mathf.Abs(d));   // gone past 1.6
-                float floorY = center.y + 0.78f + 0.12f * Mathf.Clamp01(1f - away);
-                Vector3 at = new Vector3(center.x + side * 0.82f, floorY, center.z + 0.45f * Mathf.Clamp01(away));
-                var p = pivots[i];
-                p.localScale = Vector3.one * Mathf.Max(0.001f, scale);
-                p.position = at + Vector3.up * (halfHeight[i] * scale + 0.02f);
-                // the front one turns slowly on its plinth; the others face it
-                Quaternion face = Quaternion.Euler(0f, -side * 35f, 0f);
-                p.rotation = away < 0.5f ? Quaternion.Euler(0f, Time.time * 25f, 0f) : Quaternion.Slerp(p.rotation, face, dt * 6f);
-                plinths[i].position = at;
-                plinths[i].localScale = new Vector3(0.62f, 0.02f, 0.62f) * Mathf.Max(0.001f, scale);
-            }
-            int now = Mod(Mathf.RoundToInt(offset), n);
-            if (now != front)
-            {
-                front = now;
-                TextOut(label);
-                label = Text(list[front].label, 0.5f, true);
-                FiveGLogo.Show(list[front].label == "Label_5G");
-                for (int i = 0; i < n; i++) if (beads[i] != null) beads[i].sharedMaterial = i == front ? red : light;
+                hintSwapped = true;
+                TextOut(hint);
+                hint = Text("Hint_Open", HintY, true);
             }
             yield return null;
         }
+
+        Burst(mid, 36, red, 2f);
         TextOut(title);
         TextOut(hint);
-        TextOut(label);
-        FiveGLogo.Show(false);
-        for (int i = 0; i < n; i++) if (i != pick) StartCoroutine(Shrink(pivots[i].gameObject, 0.35f));
-        var chosenPivot = pivots[pick];
-        Vector3 big = chosenPivot.localScale;
-        yield return Tween(0.4f, t => { if (chosenPivot != null) chosenPivot.localScale = big * (1f + 0.2f * Mathf.Sin(t * Mathf.PI)); });
-        yield return ShrinkAll(0.3f);
-        chosen(pick);
-    }
-
-    private static int Mod(int a, int n) => ((a % n) + n) % n;
-
-    // ------------------------------------------------ what every exhibit shares
-
-    private GameObject backLabel;
-
-    private void ExhibitStart()
-    {
-        backLabel = Text("Hint_Back", 0.12f, true);
-        lastTouch = Time.time;
-    }
-
-    // A tap low on the display, where BACK is.
-    private bool BackTapped()
-    {
-        float limit = cam.WorldToScreenPoint(center + Vector3.up * 0.24f).y;
-        foreach (var f in fingers)
-            if (f.ended && Time.time - f.since < 0.4f && (f.pos - f.start).magnitude < Screen.height * 0.03f && f.pos.y < limit) return true;
-        return false;
-    }
-
-    // Back to the carousel: BACK, 30 s without a touch, or N.
-    private bool Leaving() => Time.time - lastTouch > ExhibitIdleSeconds || BackTapped() || TakeSkip();
-
-    // The demonstration is done: the hint turns into "Demonstration complete".
-    private GameObject Completed(GameObject hint)
-    {
-        TextOut(hint);
-        return Text("Hint_Complete", HintY, true);
-    }
-
-    private IEnumerator Close(params GameObject[] texts)
-    {
-        FiveGLogo.Show(false);
-        foreach (var t in texts) TextOut(t);
-        TextOut(backLabel);
-        yield return ShrinkAll(0.45f);
-    }
-
-    // Drag to turn (it keeps turning, slowing to a slow spin), spread two fingers to open, tap a part to name it.
-    private class Inspector
-    {
-        public Transform pivot;
-        public Vector2 spin = new Vector2(12f, 0f);
-        public float explode, pinch0 = -1f, side;
-        public GameObject label;
-        public Renderer target;
-        public LineRenderer leader;
-    }
-
-    private void Inspect(Inspector s, Action<float> open, Renderer[] parts, Func<Renderer, string> nameOf, bool turn = true)
-    {
-        float dt = Mathf.Max(Time.deltaTime, 1e-4f);
-        if (turn && Held() == 1 && !fingers[0].began)
-            s.spin = Vector2.Lerp(s.spin, new Vector2(-fingers[0].delta.x, fingers[0].delta.y) / dt / Screen.height * 180f, 0.5f);
-        else
-            s.spin = Vector2.Lerp(s.spin, new Vector2(12f, 0f), dt * 0.8f);
-        s.pivot.Rotate(Vector3.up, s.spin.x * dt, Space.World);
-        s.pivot.Rotate(Vector3.right, s.spin.y * dt, Space.World);
-        if (open != null)
+        var done = Text("Lab_HeartDone", TextY);
+        for (float t = 0f, beat = 0f; t < 3.2f; t += Time.deltaTime, beat += Time.deltaTime)
         {
-            s.explode = Mathf.MoveTowards(s.explode, Spread(ref s.pinch0), dt * 2.5f);
-            open(s.explode);
-        }
-
-        foreach (var f in fingers)
-        {
-            if (!(f.ended && Time.time - f.since < 0.4f && (f.pos - f.start).magnitude < Screen.height * 0.03f)) continue;
-            Renderer best = null;
-            float bestD = Screen.height * 0.1f;
-            foreach (var r in parts)
-            {
-                if (r == null) continue;
-                float d = Vector2.Distance(f.pos, cam.WorldToScreenPoint(r.bounds.center));
-                if (d < bestD) { best = r; bestD = d; }
-            }
-            if (best == null || best == s.target) continue;
-            TextOut(s.label);
-            s.target = best;
-            s.side = cam.WorldToScreenPoint(best.bounds.center).x > Screen.width * 0.5f ? 1f : -1f;
-            s.label = Text(nameOf(best), Mathf.Clamp(best.bounds.center.y - center.y, 0.55f, 1.95f), true, s.side * 0.66f, 0.85f);
-            if (s.leader == null) { s.leader = Line(dark, 0.006f); s.leader.positionCount = 2; }
-        }
-        if (s.target != null && s.label != null && s.leader != null)
-        {
-            var labelParts = Parts(s.label);
-            if (labelParts.Length == 0) return;
-            Bounds lb = GesturePlayer.GetBounds(labelParts);
-            s.leader.SetPosition(0, s.target.bounds.center);
-            s.leader.SetPosition(1, new Vector3(s.side > 0f ? lb.min.x - 0.03f : lb.max.x + 0.03f, lb.center.y, lb.center.z));
-        }
-    }
-
-    // ------------------------------------------------ AI for health: the heart, opened and named part by part
-
-    private IEnumerator HealthExhibit()
-    {
-        var heart = Model("Models/HumanHeart/HumanHeart", 1.45f, 1.6f, 0.5f);
-        var pivot = Pivot(heart);
-        var open = Opener(heart, pivot.position, 0.35f, 0.9f);
-        var parts = Parts(heart);
-        var title = Text("Phrase_Health", TextY);
-        var hint = Text("Hint_Inspect", HintY, true);
-        ExhibitStart();
-        string Name(Renderer r)
-        {
-            string n = r.name;
-            return n.Contains("Mitral") ? "Label_Mitral" : n.Contains("Tricuspid") ? "Label_Tricuspid" : n.Contains("Aortic") ? "Label_Aortic"
-                 : n.Contains("Pulmonary") ? "Label_Pulmonary" : n.Contains("Vains") || n.Contains("Vein") ? "Label_Vessels" : "Label_Wall";
-        }
-        var look = new Inspector { pivot = pivot };
-        var outside = Array.FindAll(parts, r => Name(r) == "Label_Wall" || Name(r) == "Label_Vessels");
-        while (!Leaving())
-        {
-            Inspect(look, open, look.explode > 0.3f ? parts : outside, Name);   // the valves can be named once it is open
-            float beat = (Time.time % 1f);   // a calm 60 bpm
-            pivot.localScale = Vector3.one * (1f - 0.035f * Mathf.Exp(-beat * 9f) - 0.02f * Mathf.Exp(-Mathf.Abs(beat - 0.25f) * 14f));
+            if (beat > 0.83f) { beat = 0f; squeeze = 1f; ecg.Beat(1f); }   // on its own now, 72 bpm
+            squeeze = Mathf.MoveTowards(squeeze, 0f, Time.deltaTime * 5f);
+            pivot.localScale = Vector3.one * (1f - 0.13f * squeeze);
+            explode = Mathf.MoveTowards(explode, 0f, Time.deltaTime * 2f);
+            open(explode);
+            Swell(ring, 1f + 0.5f * squeeze);
+            ecg.Tick(Time.deltaTime);
             yield return null;
         }
-        yield return Close(title, hint, look.label);
+        TextOut(done);
+        yield return ShrinkAll(0.5f);
     }
 
-    // ------------------------------------------------ digital twins: the turbine, run up by circling its fan
+    // ------------------------------------------------ 2 engine: draw circles around the fan
 
-    private IEnumerator TurbineExhibit()
+    private IEnumerator EngineStation()
     {
-        var engine = Model("Models/Engine/source/engine_sk", 1.25f, 1.9f, 0.75f);
+        var engine = Model("Models/Engine/source/engine_sk", 1.3f, 2.0f, 0.6f);
         Transform rotor = FindPart(engine.transform, "ROTOR");
         var rotorLook = rotor != null ? rotor.GetComponent<Renderer>() : null;
-        if (rotorLook != null)   // the fan toward the viewer, a little from the side
+        if (rotorLook != null)
         {
+            // Turn it so the fan faces the viewer, a little from the side: the 3D reads, and circling the fan feels right.
             Vector3 toFan = rotorLook.bounds.center - Middle(engine);
             toFan.y = 0f;
-            engine.transform.RotateAround(Middle(engine), Vector3.up, Vector3.SignedAngle(toFan, Quaternion.Euler(0f, 35f, 0f) * Vector3.back, Vector3.up));
-            Fit(engine, 1.25f, 1.9f, 0.75f);
+            Vector3 want = Quaternion.Euler(0f, 35f, 0f) * Vector3.back;
+            engine.transform.RotateAround(Middle(engine), Vector3.up, Vector3.SignedAngle(toFan, want, Vector3.up));
+            Fit(engine, 1.3f, 2.0f, 0.6f);
         }
         var pivot = Pivot(engine);
         Vector3 mid = pivot.position;
         Vector3 fan = rotorLook != null ? rotorLook.bounds.center : mid;
-        Vector3 fanLocal = pivot.InverseTransformPoint(fan), axisLocal = pivot.InverseTransformDirection((fan - mid).normalized);
-        var parts = Parts(engine);
-        string Name(Renderer r) => r.name.Contains("ROTOR") ? "Label_Fan" : r.name.Contains("PUSH") ? "Label_Reverser" : "Label_Casing";
-        var title = Text("Title_Turbine", TextY);
-        var hint = Text("Hint_Turbine", HintY, true);
-        var gauge = Row(new Vector3(-0.7f, 0.42f, 0f), new Vector3(0.7f, 0.42f, 0f), 24, 0.04f);   // the run-up, red at the top
-        ExhibitStart();
+        Vector3 axis = (fan - mid).sqrMagnitude > 1e-6f ? (fan - mid).normalized : Vector3.back;
+        Vector3 fanLocal = pivot.InverseTransformPoint(fan), axisLocal = pivot.InverseTransformDirection(axis);
+        Vector3 rear = mid - axis * Vector3.Dot(GesturePlayer.GetBounds(Parts(engine)).extents, Abs(axis));
+
+        var title = Text("Lab_Engine", TextY);
+        var hint = Text("Hint_Engine", HintY, true);
         const float zone = 0.75f;
-        var look = new Inspector { pivot = pivot };
-        var circling = new HashSet<int>();
-        float power = 0f, inZone = 0f, doneAt = -1f;
-        while (!Leaving() && (doneAt < 0f || Time.time - doneAt < 6f))
+        var gauge = Arc(new Vector3(fan.x, fan.y, center.z - 0.9f), 0.78f, 34, 0.042f, 225f, -270f);   // a dial, clockwise
+        var streaks = new List<(Transform t, Vector3 v, float life)>();
+
+        float power = 0f, inZone = 0f;
+        while (inZone < 3f)
         {
+            if (Idle()) { Clear(); yield break; }
+            if (TakeSkip()) break;
             float dt = Time.deltaTime;
-            Vector3 fanNow = pivot.TransformPoint(fanLocal);
-            Vector2 c = cam.WorldToScreenPoint(fanNow);
-            float reach = Screen.height * 0.16f;
+            Vector2 c = cam.WorldToScreenPoint(fan);
+            float near = Screen.height * 0.04f;
             foreach (var f in fingers)
             {
-                if (f.began && Vector2.Distance(f.start, c) < reach) circling.Add(f.id);   // started on the fan: it runs it up
-                if (f.ended) { circling.Remove(f.id); continue; }
-                if (f.began || !circling.Contains(f.id)) continue;
+                if (f.began) continue;
                 Vector2 a = f.pos - f.delta - c, b = f.pos - c;
-                if (a.magnitude > 8f && b.magnitude > 8f) power += Mathf.Abs(Vector2.SignedAngle(a, b)) / 360f * 0.16f;
+                if (a.magnitude < near || b.magnitude < near) continue;
+                power += Mathf.Abs(Vector2.SignedAngle(a, b)) / 360f * 0.16f;   // about six circles to the red
             }
-            Inspect(look, null, parts, Name, circling.Count == 0);
             power = Mathf.Clamp(power - dt * 0.1f * (0.5f + power), 0f, 1.15f);
             if (power >= zone) inZone += dt;
             Fill(gauge, power, zone);
-            if (rotor != null) rotor.RotateAround(fanNow, pivot.TransformDirection(axisLocal), power * 7f * 360f * dt);
-            if (doneAt < 0f && inZone >= 3f) { doneAt = Time.time; hint = Completed(hint); }
-            yield return null;
-        }
-        yield return Close(title, hint, look.label);
-    }
+            Swell(gauge, power >= zone ? 1f + 0.25f * Mathf.Sin(Time.time * 14f) : 1f);
 
-    // ------------------------------------------------ robotics & IoT: steer the arm, put the crate on the pad
+            if (rotor != null)   // up to 7 turns a second
+                rotor.RotateAround(pivot.TransformPoint(fanLocal), pivot.TransformDirection(axisLocal), power * 7f * 360f * dt);
+            pivot.position = mid + UnityEngine.Random.insideUnitSphere * 0.008f * power * power;
 
-    private IEnumerator ArmExhibit()
-    {
-        var arm = Model("Story/RobotArm", 1.35f, 1.4f, 0.3f);
-        Transform Part(string n) => FindPart(arm.transform, n);
-        Transform turret = Part("Turret"), upper = Part("UpperArm"), fore = Part("Forearm"), wrist = Part("Wrist"),
-                  fingerL = Part("FingerL"), fingerR = Part("FingerR"), crate = Part("Crate"), basePart = Part("Base");
-        var title = Text("Dept_Robotics", TextY);
-        var hint = Text("Hint_Arm", HintY, true);
-        ExhibitStart();
-        if (turret == null || upper == null || fore == null || wrist == null || crate == null)
-        {
-            while (!Leaving()) yield return null;
-            yield return Close(title, hint);
-            yield break;
-        }
-        // The file keeps every part flat under its root (make_story_assets.py); chain them, as StoryDirector does.
-        turret.SetParent(basePart != null ? basePart : turret.parent, true);
-        upper.SetParent(turret, true);
-        fore.SetParent(upper, true);
-        wrist.SetParent(fore, true);
-        if (fingerL != null) fingerL.SetParent(wrist, true);
-        if (fingerR != null) fingerR.SetParent(wrist, true);
-        var restT = turret.localRotation; var restU = upper.localRotation; var restF = fore.localRotation;
-        Vector3 yawAxis = turret.parent.InverseTransformDirection(Vector3.up);
-        Vector3 pitchU = upper.parent.InverseTransformDirection(Vector3.right), pitchF = fore.parent.InverseTransformDirection(Vector3.right);
-        float Toward(Transform joint, Vector3 axis, Quaternion rest)   // which way bends the hand down to the crate
-        {
-            joint.localRotation = Quaternion.AngleAxis(10f, axis) * rest;
-            float plus = (wrist.position - crate.position).sqrMagnitude;
-            joint.localRotation = Quaternion.AngleAxis(-10f, axis) * rest;
-            float minus = (wrist.position - crate.position).sqrMagnitude;
-            joint.localRotation = rest;
-            return plus < minus ? 1f : -1f;
-        }
-        float su = Toward(upper, pitchU, restU), sf = Toward(fore, pitchF, restF);
-        Vector3 lRest = fingerL != null ? fingerL.localPosition : Vector3.zero, rRest = fingerR != null ? fingerR.localPosition : Vector3.zero;
-        Vector3 grip = fingerL != null && fingerR != null ? (fingerR.localPosition - fingerL.localPosition) * 0.18f : Vector3.zero;
-        void Pose(float yaw, float reach, float close)   // reach 0 = up, 1 = down at the crate (the spot's 28 / 22 degrees)
-        {
-            turret.localRotation = Quaternion.AngleAxis(yaw, yawAxis) * restT;
-            upper.localRotation = Quaternion.AngleAxis(su * 28f * reach, pitchU) * restU;
-            fore.localRotation = Quaternion.AngleAxis(sf * 22f * reach, pitchF) * restF;
-            if (fingerL != null) fingerL.localPosition = lRest + grip * close;
-            if (fingerR != null) fingerR.localPosition = rRest - grip * close;
-        }
-        Pose(110f, 0.75f, 0f);   // the pad: where the hand comes down with the arm swung round
-        Vector3 padAt = new Vector3(wrist.position.x, center.y + 0.3f, wrist.position.z);
-        Pose(0f, 1f, 0f);
-        float reachGrip = Vector3.Distance(wrist.position, crate.position) + 0.12f;
-        Pose(0f, 0f, 0f);
-        var pad = Prim(PrimitiveType.Cylinder, "Pad", red);
-        pad.transform.localScale = new Vector3(0.3f, 0.006f, 0.3f);
-        pad.transform.position = padAt;
-
-        float yawNow = 0f, reachNow = 0f, close = 0f, doneAt = -1f;
-        bool holding = false;
-        while (!Leaving() && (doneAt < 0f || Time.time - doneAt < 6f))
-        {
-            if (Held() == 1 && doneAt < 0f)
+            if (power > 0.3f && UnityEngine.Random.value < power * 0.9f)   // exhaust
             {
-                var f = fingers[0];
-                yawNow = Mathf.Clamp(yawNow - f.delta.x / Screen.height * 220f, -170f, 170f);
-                reachNow = Mathf.Clamp01(reachNow - f.delta.y / Screen.height * 2.5f);   // drag down: the arm reaches down
+                var s = Prim(PrimitiveType.Cube, "Exhaust", light, false);
+                s.transform.position = rear + UnityEngine.Random.insideUnitSphere * 0.12f;
+                s.transform.rotation = Quaternion.LookRotation(-axis);
+                s.transform.localScale = new Vector3(0.012f, 0.012f, 0.12f + 0.25f * power);
+                streaks.Add((s.transform, -axis * (1.5f + 3f * power), 0.45f));
             }
-            if (doneAt >= 0f) reachNow = Mathf.MoveTowards(reachNow, 0f, Time.deltaTime);
-            close = Mathf.MoveTowards(close, holding ? 1f : 0f, Time.deltaTime * 4f);
-            Pose(yawNow, reachNow, close);
-            if (!holding && doneAt < 0f && reachNow > 0.75f && Vector3.Distance(wrist.position, crate.position) < reachGrip)
+            for (int i = streaks.Count - 1; i >= 0; i--)
             {
-                holding = true;
-                crate.SetParent(wrist, true);
-            }
-            Vector2 flat = new Vector2(crate.position.x - padAt.x, crate.position.z - padAt.z);
-            if (holding && reachNow > 0.5f && flat.magnitude < 0.2f)
-            {
-                holding = false;
-                crate.SetParent(arm.transform, true);
-                var crateParts = crate.GetComponentsInChildren<Renderer>();
-                if (crateParts.Length > 0)
-                {
-                    Bounds b = GesturePlayer.GetBounds(crateParts);
-                    crate.position += new Vector3(padAt.x - b.center.x, padAt.y + 0.005f - b.min.y, padAt.z - b.center.z);
-                }
-                doneAt = Time.time;
-                hint = Completed(hint);
+                var (t, v, life) = streaks[i];
+                life -= dt;
+                if (t == null || life <= 0f) { if (t != null) Kill(t.gameObject); streaks.RemoveAt(i); continue; }
+                t.position += v * dt;
+                streaks[i] = (t, v, life);
             }
             yield return null;
         }
-        yield return Close(title, hint);
+
+        Burst(fan, 36, red, 2.2f);
+        TextOut(title);
+        TextOut(hint);
+        var done = Text("Lab_EngineDone", TextY);
+        for (float t = 0f; t < 2.8f; t += Time.deltaTime)
+        {
+            if (rotor != null)
+                rotor.RotateAround(pivot.TransformPoint(fanLocal), pivot.TransformDirection(axisLocal), 7f * 360f * Time.deltaTime);
+            pivot.position = mid + UnityEngine.Random.insideUnitSphere * 0.006f;
+            yield return null;
+        }
+        foreach (var s in streaks) if (s.t != null) Kill(s.t.gameObject);
+        TextOut(done);
+        yield return ShrinkAll(0.5f);
     }
 
-    // ------------------------------------------------ autonomous systems: draw a flight path, the drone flies it
+    private static Vector3 Abs(Vector3 v) => new Vector3(Mathf.Abs(v.x), Mathf.Abs(v.y), Mathf.Abs(v.z));
 
-    private IEnumerator DroneExhibit()
+    // ------------------------------------------------ 3 orbit: flick the moons round the planet
+
+    private class Moon
     {
-        var drone = Model("Story/Drone", 0.32f, 0.75f, 1.2f);
-        var body = Pivot(drone);
-        var rotors = new List<Transform>();
-        foreach (var t in drone.GetComponentsInChildren<Transform>()) if (t.name.StartsWith("Rotor")) rotors.Add(t);
-        var title = Text("Dept_Autonomous", TextY);
-        var hint = Text("Hint_Path", HintY, true);
-        ExhibitStart();
+        public Transform t;
+        public Renderer look;
+        public TrailRenderer trail;
+        public Vector2 p, v, dock;
+        public float r, swept, back;
+        public int finger = int.MinValue;   // the finger holding it
+        public bool flying, stable;
+    }
 
-        var path = new List<Vector3>();
-        var line = Line(red, 0.012f);
-        line.positionCount = 0;
-        int drawing = int.MinValue;
-        bool flying = false;
-        float along = 0f, doneAt = -1f;
-        Vector3 pos = body.position, vel = Vector3.zero;
-        Vector3 Clamp(Vector3 p) => new Vector3(Mathf.Clamp(p.x, center.x - 1.1f, center.x + 1.1f), Mathf.Clamp(p.y, center.y + 0.35f, center.y + 2.4f), center.z);
-        while (!Leaving() && (doneAt < 0f || Time.time - doneAt < 6f))
+    private IEnumerator OrbitStation()
+    {
+        var system = Load("Models/PlanetSystem/PlanetSystem");
+        var moons = new List<Moon>();
+        float[] sizes = { 0.2f, 0.15f, 0.11f };
+        for (int i = 0; i < 3; i++)
         {
+            var t = FindPart(system.transform, "moon " + (i + 1));
+            if (t == null) continue;
+            t.SetParent(null, true);
+            Track(t.gameObject);
+            var look = t.GetComponent<Renderer>();
+            if (look == null) continue;
+            t.localScale *= sizes[i] / Mathf.Max(0.0001f, look.bounds.size.x);
+            moons.Add(new Moon { t = t, look = look, r = sizes[i] * 0.5f });
+        }
+        Fit(system, 0.85f, 0.85f, Mid - 0.42f);   // what is left: the planet and its clouds
+        var planet = Pivot(system);
+        Vector3 origin = planet.position;
+        float planetR = 0.42f;
+
+        var title = Text("Lab_Orbit", TextY);
+        var hint = Text("Hint_Orbit", HintY, true);
+        var count = Row(new Vector3(-0.14f, HintY - 0.32f, 0f), new Vector3(0.14f, HintY - 0.32f, 0f), 3, 0.06f);
+        Fill(count, 0f);
+
+        const float gm = 0.55f;
+        Vector2[] docks = { new Vector2(-0.75f, -0.92f), new Vector2(0f, -1.0f), new Vector2(0.75f, -0.92f) };
+        for (int i = 0; i < moons.Count; i++)
+        {
+            var m = moons[i];
+            m.p = m.dock = docks[i];
+            m.trail = m.t.gameObject.AddComponent<TrailRenderer>();
+            m.trail.sharedMaterial = red;
+            m.trail.time = 1.4f;
+            m.trail.widthMultiplier = 0.02f;
+            m.trail.generateLightingData = true;
+            m.trail.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            m.trail.emitting = false;
+            Place(m, origin);
+        }
+
+        int stable = 0;
+        while (stable < 3)
+        {
+            if (Idle()) { Clear(); yield break; }
+            if (TakeSkip()) break;
             float dt = Time.deltaTime;
+            planet.Rotate(Vector3.up, 12f * dt, Space.World);
+
             foreach (var f in fingers)
             {
-                if (f.began && drawing == int.MinValue)   // a new path, from the drone
+                if (f.began)
                 {
-                    drawing = f.id;
-                    flying = false;
-                    path.Clear();
-                    path.Add(pos);
-                    path.Add(Clamp(OnPlane(f.pos, center.z)));
-                }
-                if (f.id != drawing) continue;
-                Vector3 p = Clamp(OnPlane(f.pos, center.z));
-                if ((p - path[path.Count - 1]).magnitude > 0.03f) path.Add(p);
-                if (f.ended)
-                {
-                    drawing = int.MinValue;
-                    flying = path.Count > 4;
-                    along = 0f;
+                    Moon best = null;
+                    float bestD = Screen.height * 0.08f;
+                    foreach (var m in moons)
+                    {
+                        if (m.stable || m.finger != int.MinValue) continue;
+                        float d = Vector2.Distance(f.pos, cam.WorldToScreenPoint(m.look.bounds.center));
+                        if (d < bestD) { best = m; bestD = d; }
+                    }
+                    if (best != null) { best.finger = f.id; best.flying = false; best.back = 0f; best.trail.emitting = false; best.trail.Clear(); }
                 }
             }
-            line.positionCount = path.Count;
-            line.SetPositions(path.ToArray());
 
-            Vector3 target = pos;
-            if (flying)
+            foreach (var m in moons)
             {
-                along += 0.8f * dt;   // metres along the path
-                float walked = 0f, total = 0f;
-                for (int i = 1; i < path.Count; i++) total += (path[i] - path[i - 1]).magnitude;
-                target = path[path.Count - 1];
-                for (int i = 1; i < path.Count; i++)
+                if (m.stable && !m.flying) continue;
+                Finger held = null;
+                if (m.finger != int.MinValue) fingerById.TryGetValue(m.finger, out held);
+                if (held != null && !held.ended)
                 {
-                    float seg = (path[i] - path[i - 1]).magnitude;
-                    if (walked + seg >= along) { target = Vector3.Lerp(path[i - 1], path[i], (along - walked) / Mathf.Max(seg, 1e-4f)); break; }
-                    walked += seg;
+                    Vector3 w = OnPlane(held.pos, origin.z) - origin;
+                    var target = new Vector2(w.x, w.y);
+                    Vector2 step = target - m.p;
+                    m.v = Vector2.Lerp(m.v, step / Mathf.Max(dt, 1e-4f), 0.35f);   // the flick, smoothed
+                    m.p = target;
                 }
-                if (along >= total && (target - pos).magnitude < 0.05f)   // the whole path flown
+                else if (m.finger != int.MinValue)   // let go
                 {
-                    flying = false;
-                    if (doneAt < 0f) { doneAt = Time.time; hint = Completed(hint); }
+                    m.finger = int.MinValue;
+                    if (m.v.magnitude > 0.25f && m.p.magnitude > planetR + m.r)
+                    {
+                        m.v = Vector2.ClampMagnitude(m.v, 3f);
+                        m.flying = true;
+                        m.swept = 0f;
+                        m.trail.Clear();
+                        m.trail.emitting = true;
+                    }
+                    else m.back = 0.001f;   // back to its place
                 }
+                else if (m.flying)
+                {
+                    for (int s = 0; s < 4; s++)   // semi-implicit Euler, a few steps a frame
+                    {
+                        float h = dt / 4f, d = Mathf.Max(m.p.magnitude, 0.05f);
+                        m.v += -gm * m.p / (d * d * d) * h;
+                        Vector2 before = m.p;
+                        m.p += m.v * h;
+                        m.swept += Vector2.SignedAngle(before, m.p) * Mathf.Deg2Rad;
+                    }
+                    Vector3 world = origin + (Vector3)m.p;
+                    bool crashed = m.p.magnitude < planetR + m.r;
+                    if (crashed || Mathf.Abs(world.x - center.x) > 1.35f || world.y < center.y - 0.1f || world.y > center.y + 3.3f)
+                    {
+                        if (crashed) Burst(world, 14, dark, 1.2f, 0.03f);
+                        if (m.stable) { stable--; Fill(count, stable / 3f); }
+                        Lost(m);
+                    }
+                    else if (!m.stable && Mathf.Abs(m.swept) > Mathf.PI * 2.5f)
+                    {
+                        m.stable = true;
+                        stable++;
+                        Fill(count, stable / 3f);
+                        Burst(world, 16, red, 1.2f, 0.03f);
+                    }
+                }
+                else if (m.back > 0f)
+                {
+                    m.back += dt / 0.6f;
+                    m.p = Vector2.Lerp(m.p, m.dock, Smooth(Mathf.Clamp01(m.back)));
+                    if (m.back >= 1f) { m.back = 0f; m.p = m.dock; }
+                }
+                Place(m, origin);
             }
-            vel = Vector3.Lerp(vel, (target - pos) * 6f, dt * 6f);
-            pos += vel * dt + Vector3.up * Mathf.Sin(Time.time * 2.6f) * 0.0012f;
-            body.SetPositionAndRotation(pos, Quaternion.Euler(Mathf.Clamp(vel.y * 6f, -15f, 15f), 0f, Mathf.Clamp(-vel.x * 12f, -25f, 25f)));
-            foreach (var r in rotors) if (r != null) r.Rotate(body.up, 1400f * dt, Space.World);
             yield return null;
         }
-        yield return Close(title, hint);
+
+        TextOut(title);
+        TextOut(hint);
+        var done = Text("Lab_OrbitDone", TextY);
+        for (float t = 0f; t < 3.2f; t += Time.deltaTime)   // the three go on round
+        {
+            planet.Rotate(Vector3.up, 12f * Time.deltaTime, Space.World);
+            foreach (var m in moons)
+            {
+                for (int s = 0; s < 4; s++)
+                {
+                    float h = Time.deltaTime / 4f, d = Mathf.Max(m.p.magnitude, 0.05f);
+                    m.v += -gm * m.p / (d * d * d) * h;
+                    m.p += m.v * h;
+                }
+                Place(m, origin);
+            }
+            yield return null;
+        }
+        TextOut(done);
+        yield return ShrinkAll(0.5f);
     }
 
-    // ------------------------------------------------ cybersecurity: intercept the red packets before they reach the lock
-
-    private IEnumerator CyberExhibit()
+    private static void Lost(Moon m)
     {
-        var padlock = Model("Story/Padlock", 0.75f, 0.8f, Mid - 0.38f);
-        var pivot = Pivot(padlock);
+        m.flying = false;
+        m.stable = false;
+        m.trail.emitting = false;
+        m.back = 0.001f;
+        m.v = Vector2.zero;
+    }
+
+    private static void Place(Moon m, Vector3 origin)
+    {
+        Vector3 offset = m.t.position - m.look.bounds.center;   // the mesh may sit off its pivot
+        m.t.position = origin + (Vector3)m.p + offset;
+        m.t.Rotate(Vector3.up, 40f * Time.deltaTime, Space.World);
+    }
+
+    // ------------------------------------------------ 4 stallion: swipe to make it run
+
+    private IEnumerator HorseStation()
+    {
+        var horse = Load("Models/Stallion/Stallion", true);
+        foreach (var r in horse.GetComponentsInChildren<Renderer>())
+            if (r.name.StartsWith("Icosphere")) r.enabled = false;   // a helper sphere inside the file
+        Fit(horse, 1.4f, 2.2f, 0.32f);
+        var tail = FindPart(horse.transform, "Tail");
+        var tailLook = tail != null ? tail.GetComponent<Renderer>() : null;
+        if (tailLook != null)   // facing right, turned a little toward the viewer
+        {
+            Vector3 toTail = tailLook.bounds.center - Middle(horse);
+            toTail.y = 0f;
+            horse.transform.RotateAround(Middle(horse), Vector3.up,
+                Vector3.SignedAngle(toTail, Quaternion.Euler(0f, -20f, 0f) * Vector3.left, Vector3.up));
+            Fit(horse, 1.4f, 2.2f, 0.32f);
+        }
+        var anim = horse.GetComponentInChildren<Animation>();
+        string idleClip = null, trotClip = null, gallopClip = null;
+        if (anim != null)
+            foreach (AnimationState s in anim)
+            {
+                if (s.name.Contains("Chew")) idleClip = s.name;
+                else if (s.name.Contains("Trot")) trotClip = s.name;
+                else if (s.name.Contains("Gallop")) gallopClip = s.name;
+                s.wrapMode = WrapMode.Loop;
+            }
+        string playing = null;
+        void Play(string clip, float speed)
+        {
+            if (anim == null || clip == null) return;
+            if (playing != clip) { anim.CrossFade(clip, 0.25f); playing = clip; }
+            anim[clip].speed = speed;
+        }
+
+        var title = Text("Lab_Horse", TextY);
+        var hint = Text("Hint_Horse", HintY, true);
+        const float zone = 0.75f;
+        var meter = Row(new Vector3(-0.8f, 2.0f, 0f), new Vector3(0.8f, 2.0f, 0f), 20, 0.05f);
+        float groundY = center.y + 0.3f;
+        var dashes = new List<Transform>();
+        for (int i = 0; i < 14; i++)
+        {
+            var d = Prim(PrimitiveType.Cube, "Track", dark, false);
+            d.transform.localScale = new Vector3(0.14f, 0.008f, 0.03f);
+            d.transform.position = new Vector3(center.x - 1.3f + i * (2.6f / 14f), groundY, center.z - 0.25f + (i % 2) * 0.5f);
+            dashes.Add(d.transform);
+        }
+
+        float energy = 0f, galloped = 0f;
+        while (galloped < 4f)
+        {
+            if (Idle()) { Clear(); yield break; }
+            if (TakeSkip()) break;
+            float dt = Time.deltaTime;
+            foreach (var f in fingers) energy += f.delta.magnitude / Screen.height * 0.9f;
+            energy = Mathf.Clamp(energy - dt * 0.35f, 0f, 1.3f);
+            if (energy >= zone) galloped += dt;
+            Fill(meter, energy, zone);
+            Gait(energy);
+            yield return null;
+        }
+
+        TextOut(title);
+        TextOut(hint);
+        var done = Text("Lab_HorseDone", TextY);
+        Burst(Middle(horse), 30, red, 2f);
+        for (float t = 0f; t < 3f; t += Time.deltaTime)
+        {
+            energy = Mathf.MoveTowards(energy, 1f, Time.deltaTime);
+            Gait(energy);
+            yield return null;
+        }
+        TextOut(done);
+        yield return ShrinkAll(0.5f);
+
+        void Gait(float e)
+        {
+            if (e < 0.2f) Play(idleClip, 1f);
+            else if (e < zone) Play(trotClip ?? gallopClip, 0.7f + e);
+            else Play(gallopClip ?? trotClip, 0.7f + 0.5f * e);
+            float speed = e * 3.2f;   // the track runs under it
+            foreach (var d in dashes)
+            {
+                if (d == null) continue;
+                var p = d.position;
+                p.x -= speed * Time.deltaTime;
+                if (p.x < center.x - 1.3f) p.x += 2.6f;
+                d.position = p;
+            }
+        }
+    }
+
+    // ------------------------------------------------ the end: the core, awake
+
+    private IEnumerator Finale()
+    {
+        var core = Model("Models/Tesseract/Tesseract", 1.5f, 1.6f, 0.45f);
+        int face = 0;
+        foreach (var r in Parts(core))   // one face for each station
+            if (face < lit && r.name.StartsWith("Cube.00") && r.name != "Cube.008") { r.sharedMaterial = red; face++; }
+        var pivot = Pivot(core);
         Vector3 mid = pivot.position;
-        var title = Text("Dept_Cyber", TextY);
-        var hint = Text("Hint_Intercept", HintY, true);
-        var shield = Arc(mid, 0.6f, 30, 0.04f, 90f, 360f);
-        Fill(shield, 0f);
-        ExhibitStart();
+        var open = Opener(core, mid, 0.2f, 0.6f);
+        Burst(mid, 50, red, 2.6f);
+        var title = Text("Lab_Awake", TextY);
+        var hint = Text("Hint_Awake", HintY, true);
 
-        const int need = 12;
-        var packets = new List<(Transform t, bool attack, float speed)>();
-        int blocked = 0;
-        float nextPacket = 0f, shake = 0f, start = Time.time, doneAt = -1f;
-        while (!Leaving() && (doneAt < 0f || Time.time - doneAt < 5f))
+        Vector2 turn = new Vector2(30f, 0f);
+        float explode = 0f, pinch0 = -1f;
+        wheelOpen = 0f;
+        lastTouch = Time.time;
+        float shownAt = Time.time;
+        // On to the opening after a while: 8 s without a touch, or 25 s in all.
+        while (Time.time - lastTouch < 8f && Time.time - shownAt < 25f && !TakeSkip())
         {
             float dt = Time.deltaTime;
-            if (doneAt < 0f && Time.time >= nextPacket)   // traffic from all round, a little faster as it goes on
-            {
-                nextPacket = Time.time + Mathf.Lerp(0.9f, 0.5f, (Time.time - start) / 40f);
-                bool attack = UnityEngine.Random.value < 0.6f;
-                float a = UnityEngine.Random.Range(0f, Mathf.PI * 2f);
-                Vector3 from = mid + new Vector3(Mathf.Cos(a) * 1.15f, Mathf.Sin(a) * 1.3f, 0f);
-                from.y = Mathf.Clamp(from.y, center.y + 0.35f, center.y + 2.5f);
-                var p = Prim(attack ? PrimitiveType.Sphere : PrimitiveType.Cube, attack ? "Attack" : "Data", attack ? red : dark, false);
-                p.transform.position = from;
-                p.transform.localScale = Vector3.one * (attack ? 0.1f : 0.07f);
-                packets.Add((p.transform, attack, UnityEngine.Random.Range(0.3f, 0.45f)));
-            }
-            foreach (var f in fingers)
-            {
-                if (!f.began || doneAt >= 0f) continue;
-                int best = -1;
-                float bestD = Screen.height * 0.07f;
-                for (int i = 0; i < packets.Count; i++)
-                {
-                    if (packets[i].t == null) continue;
-                    float d = Vector2.Distance(f.pos, cam.WorldToScreenPoint(packets[i].t.position));
-                    if (d < bestD) { best = i; bestD = d; }
-                }
-                if (best < 0) continue;
-                var (t, attack, _) = packets[best];
-                Burst(t.position, attack ? 10 : 5, attack ? red : dark, 0.8f, 0.022f);
-                if (attack) blocked++;
-                else { blocked = Mathf.Max(0, blocked - 1); shake = 1f; }   // that was legitimate traffic
-                Kill(t.gameObject);
-                packets.RemoveAt(best);
-                Fill(shield, blocked / (float)need);
-            }
-            for (int i = packets.Count - 1; i >= 0; i--)
-            {
-                var (t, attack, speed) = packets[i];
-                if (t == null) { packets.RemoveAt(i); continue; }
-                t.position = Vector3.MoveTowards(t.position, mid, speed * dt);
-                t.Rotate(Vector3.one, 90f * dt);
-                if (Vector3.Distance(t.position, mid) < 0.3f)
-                {
-                    if (attack) { shake = 1f; blocked = Mathf.Max(0, blocked - 2); Fill(shield, blocked / (float)need); }
-                    Kill(t.gameObject);
-                    packets.RemoveAt(i);
-                }
-            }
-            shake = Mathf.MoveTowards(shake, 0f, dt * 3f);
-            pivot.localRotation = Quaternion.Euler(0f, 0f, Mathf.Sin(Time.time * 50f) * 8f * shake);
-            if (doneAt < 0f && blocked >= need)
-            {
-                doneAt = Time.time;
-                hint = Completed(hint);
-                foreach (var (t, _, _) in packets) if (t != null) Kill(t.gameObject);
-                packets.Clear();
-            }
+            if (Held() == 1 && !fingers[0].began)
+                turn = Vector2.Lerp(turn, new Vector2(-fingers[0].delta.x, fingers[0].delta.y) / Mathf.Max(dt, 1e-4f) / Screen.height * 180f, 0.5f);
+            float target = Spread(ref pinch0);
+            explode = Mathf.MoveTowards(explode, target, dt * 2.5f);
+            open(explode);
+            turn = Vector2.Lerp(turn, new Vector2(30f, 0f), dt * 0.8f);   // settles back to a slow turn
+            pivot.Rotate(Vector3.up, turn.x * dt, Space.World);
+            pivot.Rotate(Vector3.right, turn.y * dt, Space.World);
             yield return null;
         }
-        yield return Close(title, hint);
+        lastTouch = Time.time;
+        TextOut(title);
+        TextOut(hint);
+        yield return ShrinkAll(0.6f);
     }
 
-    // ------------------------------------------------ 5G-SHARE: link the mast to each campus
+    // ------------------------------------------------ 5 globe: where are you from?
 
-    private IEnumerator FiveGExhibit()
+    private const string PinsKey = "HLD_LabPins";   // every visitor's pin, kept between runs (PlayerPrefs)
+    private const int MaxPins = 200;
+
+    private IEnumerator GlobeStation()
     {
-        var tower = Model("Story/Tower5G", 1.65f, 0.9f, 0.3f);
-        tower.transform.position += Vector3.forward * 0.2f;
-        Bounds tb = GesturePlayer.GetBounds(Parts(tower));
-        Vector3 top = new Vector3(tb.center.x, tb.max.y - 0.1f, tb.center.z);
-        Vector2[] spots = { new Vector2(-0.92f, -0.45f), new Vector2(0.92f, -0.45f), new Vector2(-0.72f, 0.75f), new Vector2(0.72f, 0.75f) };
-        var hubs = new List<Vector3>();
-        foreach (var s in spots)
-        {
-            var hub = Model("Story/Hub", 0.38f, 0.5f, 0.3f);
-            hub.transform.position += new Vector3(s.x, 0f, s.y);
-            Bounds hb = GesturePlayer.GetBounds(Parts(hub));
-            hubs.Add(new Vector3(hb.center.x, hb.max.y, hb.center.z));
-        }
-        var title = Text("Phrase_5G", TextY);
-        var hint = Text("Hint_5G", HintY, true);
-        ExhibitStart();
-        FiveGLogo.Show(true);
-
-        var linked = new bool[hubs.Count];
-        int links = 0, dragging = int.MinValue;
-        float doneAt = -1f;
-        LineRenderer cable = null;
-        while (!Leaving() && (doneAt < 0f || Time.time - doneAt < 6f))
-        {
-            Vector2 mast = cam.WorldToScreenPoint(top), foot = cam.WorldToScreenPoint(new Vector3(top.x, tb.min.y, top.z));
-            foreach (var f in fingers)
-            {
-                if (f.began && dragging == int.MinValue && Mathf.Abs(f.pos.x - mast.x) < Screen.height * 0.08f && f.pos.y > foot.y - 20f && f.pos.y < mast.y + Screen.height * 0.06f)
-                {
-                    dragging = f.id;
-                    cable = Line(red, 0.014f);
-                }
-                if (f.id != dragging || cable == null) continue;
-                SetArc(cable, top, OnPlane(f.pos, top.z), 0.15f);
-                if (!f.ended) continue;
-                int best = -1;
-                float bestD = Screen.height * 0.12f;
-                for (int i = 0; i < hubs.Count; i++)
-                {
-                    if (linked[i]) continue;
-                    float d = Vector2.Distance(f.pos, cam.WorldToScreenPoint(hubs[i]));
-                    if (d < bestD) { best = i; bestD = d; }
-                }
-                if (best >= 0)
-                {
-                    linked[best] = true;
-                    links++;
-                    SetArc(cable, top, hubs[best], 0.35f);
-                    StartCoroutine(Packets(top, hubs[best]));
-                }
-                else Kill(cable.gameObject);
-                cable = null;
-                dragging = int.MinValue;
-            }
-            if (dragging != int.MinValue && !fingerById.ContainsKey(dragging)) { if (cable != null) Kill(cable.gameObject); cable = null; dragging = int.MinValue; }
-            if (doneAt < 0f && links == hubs.Count)
-            {
-                doneAt = Time.time;
-                hint = Completed(hint);
-                StartCoroutine(Waves(new Vector3(top.x, tb.min.y + 0.02f, top.z)));
-            }
-            yield return null;
-        }
-        yield return Close(title, hint);
-    }
-
-    private IEnumerator Waves(Vector3 at)
-    {
-        for (int w = 0; w < 3; w++)
-        {
-            var ring = Load("Story/Ring");
-            ring.transform.position = at;
-            StartCoroutine(Tween(1.2f, t => { if (ring != null) ring.transform.localScale = Vector3.one * Mathf.Max(0.001f, Mathf.Lerp(0.15f, 1.2f, t) * (1f - t * t)); }));
-            yield return new WaitForSeconds(0.35f);
-        }
-    }
-
-    // ------------------------------------------------ our guests: where everyone came from
-
-    private IEnumerator GuestsExhibit()
-    {
-        var globe = Model("Models/Globe/Atlas", 1.45f, 1.45f, 0.55f);
+        var globe = Model("Models/Globe/Atlas", 1.45f, 1.45f, 0.5f);
         var pivot = Pivot(globe);
         Vector3 mid = pivot.position;
         float radius = GesturePlayer.GetBounds(Parts(globe)).extents.y;
@@ -1126,17 +826,18 @@ public class HoloLab : MonoBehaviour
             Pin(globe.transform, mid, radius, globe.transform.TransformDirection(dir), false);
         var title = Text("Lab_Globe", TextY);
         var hint = Text("Hint_Globe", HintY, true);
-        ExhibitStart();
 
-        float yaw = 0f, yawSpeed = 15f, tilt = 0f;
-        while (!Leaving())
+        float yaw = 0f, yawSpeed = 15f, tilt = 0f, doneAt = -1f;
+        while (doneAt < 0f || Time.time < doneAt)
         {
-            float dt = Mathf.Max(Time.deltaTime, 1e-4f);
+            if (Idle()) { Clear(); yield break; }
+            if (TakeSkip()) break;
+            float dt = Time.deltaTime;
             foreach (var f in fingers)
             {
-                if (!f.began && !f.ended && Held() == 1)   // drag: spin and tilt; a flick keeps it turning
+                if (!f.began && !f.ended && Held() == 1)   // drag: spin and tilt, with a flick it keeps turning
                 {
-                    yawSpeed = Mathf.Lerp(yawSpeed, -f.delta.x / dt / Screen.height * 220f, 0.5f);
+                    yawSpeed = Mathf.Lerp(yawSpeed, -f.delta.x / Mathf.Max(dt, 1e-4f) / Screen.height * 220f, 0.5f);
                     tilt = Mathf.Clamp(tilt + f.delta.y / Screen.height * 90f, -30f, 30f);
                 }
                 bool tap = f.ended && Time.time - f.since < 0.35f && (f.pos - f.start).magnitude < Screen.height * 0.03f;
@@ -1144,6 +845,8 @@ public class HoloLab : MonoBehaviour
                 {
                     Pin(globe.transform, mid, radius, hit - mid, true);
                     SavePin(globe.transform.InverseTransformDirection((hit - mid).normalized));
+                    if (doneAt < 0f) doneAt = Time.time + 4f;   // a moment for the others to add theirs
+                    else doneAt = Mathf.Max(doneAt, Time.time + 2f);
                 }
             }
             yawSpeed = Mathf.Lerp(yawSpeed, 15f, dt * 0.6f);
@@ -1151,14 +854,19 @@ public class HoloLab : MonoBehaviour
             pivot.rotation = Quaternion.AngleAxis(tilt, Vector3.right) * Quaternion.AngleAxis(yaw, Vector3.up);
             yield return null;
         }
-        yield return Close(title, hint);
+
+        TextOut(title);
+        TextOut(hint);
+        var done = Text("Lab_GlobeDone", TextY);
+        for (float t = 0f; t < 2.6f; t += Time.deltaTime)
+        {
+            yaw += 40f * Time.deltaTime;
+            pivot.rotation = Quaternion.AngleAxis(tilt, Vector3.right) * Quaternion.AngleAxis(yaw, Vector3.up);
+            yield return null;
+        }
+        TextOut(done);
+        yield return ShrinkAll(0.5f);
     }
-
-    // ------------------------------------------------ helpers of the exhibits
-
-    private const string PinsKey = "HLD_LabPins";   // every visitor's pin, kept between runs (PlayerPrefs)
-    private const int MaxPins = 200;
-    private int confettiMade;
 
     private bool HitSphere(Vector2 screen, Vector3 c, float r, out Vector3 hit)
     {
@@ -1218,6 +926,151 @@ public class HoloLab : MonoBehaviour
         PlayerPrefs.Save();
     }
 
+    // ------------------------------------------------ the opening: raise the institute, cut the ribbon
+
+    private int confettiMade;
+
+    private IEnumerator Ceremony()
+    {
+        confettiMade = 0;
+        var plaza = Load("Story/Plaza");
+        plaza.transform.localScale *= 1.15f;
+        plaza.transform.position = center + Vector3.up * 0.078f;
+        var lab = Model("Story/AIRI_Lab", 2.0f, 2.2f, 0.078f);
+        lab.transform.position += Vector3.forward * 0.3f;
+        var floors = new List<Transform>();   // F0..F6, roof, door (make_story_assets.py lab())
+        foreach (var t in lab.GetComponentsInChildren<Transform>(true))
+            if ((t.name.Length == 2 && t.name[0] == 'F' && char.IsDigit(t.name[1])) || t.name == "Roof" || t.name == "Door") floors.Add(t);
+        int Order(string n) => n == "Door" ? 0 : n == "Roof" ? 99 : n[1] - '0';
+        floors.Sort((p, q) => Order(p.name).CompareTo(Order(q.name)));
+        foreach (var f in floors) f.gameObject.SetActive(false);
+
+        // 1: every tap raises the next storey; several fingers, several storeys
+        var title = Text("Lab_Build", TextY);
+        var hint = Text("Hint_Build", HintY, true);
+        int next = 0;
+        lastTouch = Time.time;
+        while (next < floors.Count)
+        {
+            if (next > 0 && Idle()) { Clear(); yield break; }   // the untouched building is the resting state
+            bool all = TakeSkip();
+            foreach (var f in fingers)
+                if ((f.began || all) && next < floors.Count) Raise(floors[next++]);
+            while (all && next < floors.Count) Raise(floors[next++]);
+            yield return null;
+        }
+        yield return new WaitForSeconds(0.8f);
+        TextOut(title);
+        TextOut(hint);
+
+        // 2: the ribbon between two posts in front of the door; a swipe across cuts it
+        float groundY = center.y + 0.078f, tieY = groundY + 0.5f, z = center.z - 0.55f, half = 0.78f;
+        foreach (float x in new[] { -half - 0.02f, half + 0.02f })
+        {
+            var post = Prim(PrimitiveType.Cylinder, "Post", dark);
+            post.transform.localScale = new Vector3(0.035f, (tieY - groundY + 0.04f) * 0.5f, 0.035f);
+            post.transform.position = new Vector3(center.x + x, (groundY + tieY + 0.04f) * 0.5f, z);
+            var top = Prim(PrimitiveType.Sphere, "Post top", red);
+            top.transform.localScale = Vector3.one * 0.06f;
+            top.transform.position = new Vector3(center.x + x, tieY + 0.05f, z);
+        }
+        const int pieces = 28;
+        float length = 2f * half / pieces;
+        var ribbon = new List<Transform>();
+        for (int i = 0; i < pieces; i++)
+        {
+            var seg = Prim(PrimitiveType.Cube, "Ribbon", red);
+            seg.transform.localScale = new Vector3(length * 1.08f, 0.07f, 0.006f);
+            ribbon.Add(seg.transform);
+        }
+        var bow = new List<Transform>();
+        foreach (float a in new[] { 35f, -35f, 0f })
+        {
+            var loop = Prim(PrimitiveType.Sphere, "Bow", red);
+            loop.transform.localScale = a == 0f ? new Vector3(0.06f, 0.06f, 0.04f) : new Vector3(0.16f, 0.07f, 0.025f);
+            loop.transform.rotation = Quaternion.Euler(0f, 0f, a);
+            bow.Add(loop.transform);
+        }
+        Vector3 Point(float s, float wave) =>   // along the ribbon, 0..1, with a gentle sag and flutter
+            new Vector3(center.x - half + 2f * half * s, tieY - 0.07f * (1f - (2f * s - 1f) * (2f * s - 1f)) + wave, z);
+        void Lay(float time)
+        {
+            for (int i = 0; i < pieces; i++)
+            {
+                if (ribbon[i] == null) continue;
+                float s0 = i / (float)pieces, s1 = (i + 1f) / pieces;
+                Vector3 a = Point(s0, Mathf.Sin(time * 3f + i * 0.5f) * 0.006f), b = Point(s1, Mathf.Sin(time * 3f + (i + 1) * 0.5f) * 0.006f);
+                ribbon[i].position = (a + b) * 0.5f;
+                ribbon[i].rotation = Quaternion.FromToRotation(Vector3.right, b - a);
+            }
+            for (int i = 0; i < bow.Count; i++)
+                if (bow[i] != null) bow[i].position = Point(0.5f, 0f) + new Vector3((i == 0 ? -1 : i == 1 ? 1 : 0) * 0.07f, 0f, -0.02f);
+        }
+        title = Text("Lab_Ribbon", TextY);
+        hint = Text("Hint_Ribbon", HintY, true);
+        int cut = -1;
+        while (cut < 0)
+        {
+            if (Idle()) { Clear(); yield break; }
+            if (TakeSkip()) cut = pieces / 2;
+            Lay(Time.time);
+            foreach (var f in fingers)
+            {
+                if (f.began || f.delta.magnitude < Screen.height * 0.008f) continue;   // a swipe, not a touch
+                Vector2 a = f.pos - f.delta, b = f.pos;
+                for (int i = 0; i < pieces && cut < 0; i++)
+                {
+                    Vector2 p = cam.WorldToScreenPoint(ribbon[i].position - ribbon[i].right * length * 0.5f);
+                    Vector2 q = cam.WorldToScreenPoint(ribbon[i].position + ribbon[i].right * length * 0.5f);
+                    if (Crosses(a, b, p, q)) cut = i;
+                }
+            }
+            yield return null;
+        }
+
+        // Cut: the two halves swing down from their posts, the bow drops, confetti rains.
+        Vector3 cutAt = ribbon[cut].position;
+        Kill(ribbon[cut].gameObject);
+        TextOut(title);
+        TextOut(hint);
+        Burst(cutAt, 24, red, 1.6f, 0.03f);
+        StartCoroutine(Confetti(Vector3.zero, 160, true));
+        StartCoroutine(Fall(bow, groundY));
+        StartCoroutine(Hang(ribbon, 0, cut, new Vector3(center.x - half, tieY, z), 1f, length));
+        StartCoroutine(Hang(ribbon, cut + 1, pieces, new Vector3(center.x + half, tieY, z), -1f, length));
+        yield return new WaitForSeconds(0.6f);
+        var welcome = Text("Phrase_Welcome", TextY);
+        hint = Text("Hint_Confetti", HintY, true);
+
+        // 3: the celebration; every tap throws more confetti; on to the menu 6 s after the last touch (20 s at most)
+        lastTouch = Time.time;
+        float since = Time.time;
+        while (Time.time - lastTouch < 6f && Time.time - since < 20f && !TakeSkip())
+        {
+            foreach (var f in fingers)
+                if (f.began) StartCoroutine(Confetti(OnPlane(f.pos, center.z - 0.6f), 40, false));
+            yield return null;
+        }
+        TextOut(welcome);
+        TextOut(hint);
+        yield return ShrinkAll(0.6f);
+    }
+
+    // One storey: it appears a little above its place and settles down into it, widening as it lands.
+    private void Raise(Transform part)
+    {
+        part.gameObject.SetActive(true);
+        Vector3 rest = part.localPosition, scale = part.localScale;
+        Vector3 lift = part.parent.InverseTransformVector(Vector3.up * 0.45f);
+        StartCoroutine(Tween(0.55f, t =>
+        {
+            if (part == null) return;
+            part.localPosition = Vector3.LerpUnclamped(rest + lift, rest, EaseOutBack(t));
+            float plan = Mathf.Lerp(0.8f, 1f, Smooth(t));
+            part.localScale = Vector3.Scale(scale, new Vector3(plan, 1f, plan));
+        }));
+    }
+
     private static bool Crosses(Vector2 a, Vector2 b, Vector2 p, Vector2 q)
     {
         float Side(Vector2 o, Vector2 u, Vector2 v) => (u.x - o.x) * (v.y - o.y) - (u.y - o.y) * (v.x - o.x);
@@ -1225,8 +1078,7 @@ public class HoloLab : MonoBehaviour
     }
 
     // Ribbon pieces [from, to) swing down from `anchor` (side +1: hanging off the left post, -1: the right one).
-    // What reaches the ground lies along it, toward the middle (the halves are longer than the posts are tall).
-    private IEnumerator Hang(List<Transform> ribbon, int from, int to, Vector3 anchor, float side, float length, float groundY)
+    private IEnumerator Hang(List<Transform> ribbon, int from, int to, Vector3 anchor, float side, float length)
     {
         int count = to - from;
         if (count <= 0) yield break;
@@ -1240,18 +1092,8 @@ public class HoloLab : MonoBehaviour
                 // from level to hanging, overshooting and settling like a pendulum
                 float angle = -88f * (1f - Mathf.Exp(-3.5f * lag) * Mathf.Cos(7f * lag)) * Mathf.Deg2Rad;
                 Vector3 dir = new Vector3(Mathf.Cos(angle) * side, Mathf.Sin(angle), 0f);
-                float s = length * (k + 0.5f), down = anchor.y - groundY - 0.006f;
-                if (dir.y < -0.01f && -dir.y * s > down)
-                {
-                    float reach = down / -dir.y;   // where it meets the ground
-                    ribbon[i].position = new Vector3(anchor.x + dir.x * reach + side * (s - reach), groundY + 0.006f, anchor.z);
-                    ribbon[i].rotation = Quaternion.Euler(90f, 0f, 0f);
-                }
-                else
-                {
-                    ribbon[i].position = anchor + dir * s;
-                    ribbon[i].rotation = Quaternion.FromToRotation(Vector3.right, dir * side);
-                }
+                ribbon[i].position = anchor + dir * length * (k + 0.5f);
+                ribbon[i].rotation = Quaternion.FromToRotation(Vector3.right, dir * side);
             }
             yield return null;
         }
@@ -1334,6 +1176,413 @@ public class HoloLab : MonoBehaviour
         return 1f + c3 * Mathf.Pow(t - 1f, 3f) + c1 * Mathf.Pow(t - 1f, 2f);
     }
 
+    // ------------------------------------------------ the menu: play the lab, or AIRI research
+
+    private IEnumerator Menu(Action<bool> chosen)
+    {
+        var title = Text("Lab_Menu", TextY);
+        var play = Model("Models/Tesseract/Tesseract", 0.9f, 0.9f, 0.95f);
+        play.transform.position += Vector3.left * 0.6f;
+        var research = Model("Story/RobotArm", 1.05f, 0.95f, 0.85f);
+        research.transform.position += Vector3.right * 0.6f;
+        var playPivot = Pivot(play);
+        var researchPivot = Pivot(research);
+        var playLabel = Text("Hint_Play", 0.62f, true, -0.6f, 1.05f);
+        var researchLabel = Text("Hint_Research", 0.62f, true, 0.6f, 1.05f);
+
+        lastTouch = Time.time;
+        int pick = -1;
+        while (pick < 0)
+        {
+            if (Idle()) { Clear(); yield break; }
+            if (TakeSkip()) pick = 0;
+            float bob = Mathf.Sin(Time.time * 2f) * 0.04f;
+            playPivot.Rotate(Vector3.up, 30f * Time.deltaTime, Space.World);
+            researchPivot.Rotate(Vector3.up, -20f * Time.deltaTime, Space.World);
+            playPivot.localScale = Vector3.one * (1f + bob);
+            researchPivot.localScale = Vector3.one * (1f - bob);
+            foreach (var f in fingers)   // a tap on either half of the display
+                if (f.ended && Time.time - f.since < 0.5f && (f.pos - f.start).magnitude < Screen.height * 0.05f)
+                    pick = f.pos.x < Screen.width * 0.5f ? 0 : 1;
+            yield return null;
+        }
+        Transform picked = pick == 0 ? playPivot : researchPivot, other = pick == 0 ? researchPivot : playPivot;
+        Burst(picked.position, 40, red, 2f);
+        TextOut(title);
+        TextOut(playLabel);
+        TextOut(researchLabel);
+        StartCoroutine(Shrink(other.gameObject, 0.35f));
+        yield return Tween(0.45f, t => { if (picked != null) picked.localScale = Vector3.one * (1f + 0.3f * Mathf.Sin(t * Mathf.PI)); });
+        yield return ShrinkAll(0.35f);
+        chosen(pick == 1);
+        lastTouch = Time.time;
+    }
+
+    // ------------------------------------------------ research 1: robotics, the arm puts the box on the pad
+
+    private IEnumerator ArmStation()
+    {
+        var arm = Model("Story/RobotArm", 1.35f, 1.4f, 0.15f);
+        Transform Part(string n) => FindPart(arm.transform, n);
+        Transform turret = Part("Turret"), upper = Part("UpperArm"), fore = Part("Forearm"), wrist = Part("Wrist"),
+                  fingerL = Part("FingerL"), fingerR = Part("FingerR"), crate = Part("Crate"), basePart = Part("Base");
+        var title = Text("Dept_Robotics", TextY);
+        var hint = Text("Hint_Arm", HintY, true);
+        if (turret == null || upper == null || fore == null || wrist == null || crate == null) { yield return Done(title, hint); yield break; }
+        // The file keeps every part flat under its root (make_story_assets.py); chain them, as StoryDirector does.
+        turret.SetParent(basePart != null ? basePart : turret.parent, true);
+        upper.SetParent(turret, true);
+        fore.SetParent(upper, true);
+        wrist.SetParent(fore, true);
+        if (fingerL != null) fingerL.SetParent(wrist, true);
+        if (fingerR != null) fingerR.SetParent(wrist, true);
+        var restT = turret.localRotation; var restU = upper.localRotation; var restF = fore.localRotation;
+        Vector3 yawAxis = turret.parent.InverseTransformDirection(Vector3.up);
+        Vector3 pitchU = upper.parent.InverseTransformDirection(Vector3.right), pitchF = fore.parent.InverseTransformDirection(Vector3.right);
+        float Toward(Transform joint, Vector3 axis, Quaternion rest)   // which way bends the hand down to the box
+        {
+            joint.localRotation = Quaternion.AngleAxis(10f, axis) * rest;
+            float plus = (wrist.position - crate.position).sqrMagnitude;
+            joint.localRotation = Quaternion.AngleAxis(-10f, axis) * rest;
+            float minus = (wrist.position - crate.position).sqrMagnitude;
+            joint.localRotation = rest;
+            return plus < minus ? 1f : -1f;
+        }
+        float su = Toward(upper, pitchU, restU), sf = Toward(fore, pitchF, restF);
+        Vector3 lRest = fingerL != null ? fingerL.localPosition : Vector3.zero, rRest = fingerR != null ? fingerR.localPosition : Vector3.zero;
+        Vector3 grip = fingerL != null && fingerR != null ? (fingerR.localPosition - fingerL.localPosition) * 0.18f : Vector3.zero;
+        void Pose(float yaw, float reach, float close)   // reach 0 = up, 1 = down at the box (the spot's 28 / 22 degrees)
+        {
+            turret.localRotation = Quaternion.AngleAxis(yaw, yawAxis) * restT;
+            upper.localRotation = Quaternion.AngleAxis(su * 28f * reach, pitchU) * restU;
+            fore.localRotation = Quaternion.AngleAxis(sf * 22f * reach, pitchF) * restF;
+            if (fingerL != null) fingerL.localPosition = lRest + grip * close;
+            if (fingerR != null) fingerR.localPosition = rRest - grip * close;
+        }
+        // The pad: where the hand comes down when the arm is swung round (as in the spot), on the floor.
+        Pose(110f, 0.75f, 0f);
+        Vector3 padAt = new Vector3(wrist.position.x, center.y + 0.15f, wrist.position.z);
+        Pose(0f, 1f, 0f);
+        float reachGrip = Vector3.Distance(wrist.position, crate.position) + 0.12f;
+        Pose(0f, 0f, 0f);
+        var pad = Prim(PrimitiveType.Cylinder, "Pad", red);
+        pad.transform.localScale = new Vector3(0.3f, 0.006f, 0.3f);
+        pad.transform.position = padAt;
+
+        float yawNow = 0f, reachNow = 0f, close = 0f;
+        bool holding = false;
+        while (true)
+        {
+            if (Idle()) { Clear(); yield break; }
+            if (TakeSkip()) break;
+            if (Held() == 1)
+            {
+                var f = fingers[0];
+                yawNow = Mathf.Clamp(yawNow - f.delta.x / Screen.height * 220f, -170f, 170f);
+                reachNow = Mathf.Clamp01(reachNow - f.delta.y / Screen.height * 2.5f);   // drag down: the arm reaches down
+            }
+            close = Mathf.MoveTowards(close, holding ? 1f : 0f, Time.deltaTime * 4f);
+            Pose(yawNow, reachNow, close);
+            if (!holding && reachNow > 0.75f && Vector3.Distance(wrist.position, crate.position) < reachGrip)
+            {
+                holding = true;
+                crate.SetParent(wrist, true);
+                Burst(crate.position, 10, dark, 0.7f, 0.025f);
+            }
+            Vector2 flat = new Vector2(crate.position.x - padAt.x, crate.position.z - padAt.z);
+            if (holding && reachNow > 0.5f && flat.magnitude < 0.2f)
+            {
+                crate.SetParent(arm.transform, true);
+                var parts = crate.GetComponentsInChildren<Renderer>();
+                if (parts.Length > 0)
+                {
+                    Bounds b = GesturePlayer.GetBounds(parts);
+                    crate.position += new Vector3(padAt.x - b.center.x, padAt.y + 0.005f - b.min.y, padAt.z - b.center.z);
+                }
+                break;
+            }
+            yield return null;
+        }
+        Burst(padAt + Vector3.up * 0.1f, 30, red, 1.6f);
+        for (float t = 0f; t < 0.6f; t += Time.deltaTime)
+        {
+            close = Mathf.MoveTowards(close, 0f, Time.deltaTime * 4f);
+            reachNow = Mathf.MoveTowards(reachNow, 0f, Time.deltaTime * 2f);
+            Pose(yawNow, reachNow, close);
+            yield return null;
+        }
+        yield return Done(title, hint);
+    }
+
+    // Swaps the headline and hint for "Well done", holds it, and clears the station.
+    private IEnumerator Done(GameObject title, GameObject hint)
+    {
+        TextOut(title);
+        TextOut(hint);
+        var done = Text("Lab_Done", TextY);
+        yield return new WaitForSeconds(2.2f);
+        TextOut(done);
+        yield return ShrinkAll(0.5f);
+    }
+
+    // ------------------------------------------------ research 2: autonomous systems, fly the drone through the rings
+
+    private IEnumerator DroneStation()
+    {
+        var drone = Model("Story/Drone", 0.32f, 0.75f, 1.2f);
+        var body = Pivot(drone);
+        var rotors = new List<Transform>();
+        foreach (var t in drone.GetComponentsInChildren<Transform>()) if (t.name.StartsWith("Rotor")) rotors.Add(t);
+        var title = Text("Dept_Autonomous", TextY);
+        var hint = Text("Hint_Drone", HintY, true);
+
+        Vector2[] spots = { new Vector2(-0.6f, 1.85f), new Vector2(0.62f, 1.25f), new Vector2(-0.35f, 0.55f) };
+        var rings = new List<GameObject>();
+        foreach (var p in spots)
+        {
+            var ring = Load("Story/Ring");
+            ring.transform.rotation = Quaternion.Euler(90f, 0f, 0f) * ring.transform.rotation;   // the flat ring stood up to face the viewer
+            ring.transform.localScale = Vector3.one * 0.26f;
+            ring.transform.position = new Vector3(center.x + p.x, center.y + p.y, center.z);
+            foreach (var r in ring.GetComponentsInChildren<Renderer>()) r.sharedMaterial = light;
+            rings.Add(ring);
+        }
+        int next = 0;
+        Vector3 pos = body.position, vel = Vector3.zero;
+        while (next < rings.Count)
+        {
+            if (Idle()) { Clear(); yield break; }
+            if (TakeSkip()) break;
+            float dt = Time.deltaTime;
+            for (int i = 0; i < rings.Count; i++)
+                foreach (var r in rings[i].GetComponentsInChildren<Renderer>())
+                    r.sharedMaterial = i < next ? dark : i == next ? red : light;
+            rings[next].transform.localScale = Vector3.one * 0.26f * (1f + 0.06f * Mathf.Sin(Time.time * 6f));
+
+            Vector3 target = pos;
+            if (Held() >= 1) target = OnPlane(fingers[0].pos, center.z) + Vector3.up * 0.05f;
+            target.x = Mathf.Clamp(target.x, center.x - 1.1f, center.x + 1.1f);
+            target.y = Mathf.Clamp(target.y, center.y + 0.3f, center.y + 2.4f);
+            Vector3 want = (target - pos) * 4f;
+            vel = Vector3.Lerp(vel, want, dt * 5f);
+            pos += vel * dt + Vector3.up * Mathf.Sin(Time.time * 2.6f) * 0.0015f;
+            body.SetPositionAndRotation(pos, Quaternion.Euler(Mathf.Clamp(vel.y * 6f, -15f, 15f), 0f, Mathf.Clamp(-vel.x * 12f, -25f, 25f)));
+            foreach (var r in rotors) if (r != null) r.Rotate(body.up, 1400f * dt, Space.World);
+
+            Vector3 c = rings[next].transform.position;
+            if (new Vector2(pos.x - c.x, pos.y - c.y).magnitude < 0.17f)
+            {
+                Burst(c, 18, red, 1.3f, 0.03f);
+                next++;
+            }
+            yield return null;
+        }
+        yield return Done(title, hint);
+    }
+
+    // ------------------------------------------------ research 3: data labelling, tap each object to label it
+
+    private IEnumerator LabelStation()
+    {
+        var things = Model("Story/Labelling", 0.85f, 2.0f, 0.75f);
+        var pivot = Pivot(things);
+        var boxes = new List<Transform>();
+        var tags = new List<Transform>();
+        for (int i = 0; i < 3; i++)
+        {
+            var box = FindPart(things.transform, "Box" + i);
+            var tag = FindPart(things.transform, "Tag" + i);
+            if (box == null) continue;
+            box.gameObject.SetActive(false);
+            if (tag != null) tag.gameObject.SetActive(false);
+            boxes.Add(box);
+            tags.Add(tag);
+        }
+        var title = Text("Dept_Labelling", TextY);
+        var hint = Text("Hint_Label", HintY, true);
+        int labelled = 0;
+        float angle = 0f;
+        while (labelled < boxes.Count)
+        {
+            if (Idle()) { Clear(); yield break; }
+            if (TakeSkip()) break;
+            angle += Time.deltaTime;
+            pivot.rotation = Quaternion.Euler(0f, Mathf.Sin(angle * 0.7f) * 28f, 0f);   // they turn, so the 3D reads
+            foreach (var f in fingers)
+            {
+                if (!f.began) continue;
+                int best = -1;
+                float bestD = Screen.height * 0.12f;
+                for (int i = 0; i < boxes.Count; i++)
+                {
+                    if (boxes[i].gameObject.activeSelf) continue;
+                    float d = Vector2.Distance(f.pos, cam.WorldToScreenPoint(boxes[i].position));
+                    if (d < bestD) { best = i; bestD = d; }
+                }
+                if (best < 0) continue;
+                labelled++;
+                foreach (var t in new[] { boxes[best], tags[best] })
+                {
+                    if (t == null) continue;
+                    t.gameObject.SetActive(true);
+                    Vector3 full = t.localScale;
+                    StartCoroutine(Tween(0.35f, k => { if (t != null) t.localScale = full * Mathf.Max(0.001f, EaseOutBack(k)); }));
+                }
+                Burst(boxes[best].position, 14, red, 1f, 0.03f);
+            }
+            yield return null;
+        }
+        yield return new WaitForSeconds(0.6f);
+        yield return Done(title, hint);
+    }
+
+    // ------------------------------------------------ research 4: cybersecurity, tap the red attacks before they hit
+
+    private IEnumerator CyberStation()
+    {
+        var padlock = Model("Story/Padlock", 0.75f, 0.8f, Mid - 0.38f);
+        var pivot = Pivot(padlock);
+        Vector3 mid = pivot.position;
+        var title = Text("Dept_Cyber", TextY);
+        var hint = Text("Hint_Cyber", HintY, true);
+        var shield = Arc(mid, 0.6f, 30, 0.04f, 90f, 360f);
+        Fill(shield, 0f);
+
+        const int need = 12;
+        var packets = new List<(Transform t, bool attack, float speed)>();
+        int blocked = 0;
+        float nextPacket = 0f, shake = 0f, start = Time.time;
+        while (blocked < need)
+        {
+            if (Idle()) { Clear(); yield break; }
+            if (TakeSkip()) break;
+            float dt = Time.deltaTime;
+            if (Time.time >= nextPacket)   // traffic from all round, faster as it goes on
+            {
+                nextPacket = Time.time + Mathf.Lerp(0.9f, 0.45f, (Time.time - start) / 40f);
+                bool attack = UnityEngine.Random.value < 0.65f;
+                float a = UnityEngine.Random.Range(0f, Mathf.PI * 2f);
+                Vector3 from = mid + new Vector3(Mathf.Cos(a) * 1.15f, Mathf.Sin(a) * 1.3f, 0f);
+                from.y = Mathf.Clamp(from.y, center.y + 0.2f, center.y + 2.5f);
+                var p = Prim(attack ? PrimitiveType.Sphere : PrimitiveType.Cube, attack ? "Attack" : "Data", attack ? red : dark, false);
+                p.transform.position = from;
+                p.transform.localScale = Vector3.one * (attack ? 0.1f : 0.07f);
+                packets.Add((p.transform, attack, UnityEngine.Random.Range(0.3f, 0.5f)));
+            }
+            foreach (var f in fingers)
+            {
+                if (!f.began) continue;
+                int best = -1;
+                float bestD = Screen.height * 0.07f;
+                for (int i = 0; i < packets.Count; i++)
+                {
+                    if (packets[i].t == null) continue;
+                    float d = Vector2.Distance(f.pos, cam.WorldToScreenPoint(packets[i].t.position));
+                    if (d < bestD) { best = i; bestD = d; }
+                }
+                if (best < 0) continue;
+                var (t, attack, _) = packets[best];
+                Burst(t.position, attack ? 12 : 6, attack ? red : dark, 1f, 0.025f);
+                if (attack) blocked++;
+                else { blocked = Mathf.Max(0, blocked - 1); shake = 1f; }   // that was good traffic
+                Kill(t.gameObject);
+                packets.RemoveAt(best);
+                Fill(shield, blocked / (float)need);
+            }
+            for (int i = packets.Count - 1; i >= 0; i--)
+            {
+                var (t, attack, speed) = packets[i];
+                if (t == null) { packets.RemoveAt(i); continue; }
+                t.position = Vector3.MoveTowards(t.position, mid, speed * dt);
+                t.Rotate(Vector3.one, 90f * dt);
+                if (Vector3.Distance(t.position, mid) < 0.3f)
+                {
+                    if (attack) { shake = 1f; blocked = Mathf.Max(0, blocked - 2); Burst(t.position, 10, dark, 0.9f, 0.025f); Fill(shield, blocked / (float)need); }
+                    Kill(t.gameObject);
+                    packets.RemoveAt(i);
+                }
+            }
+            shake = Mathf.MoveTowards(shake, 0f, dt * 3f);
+            pivot.localRotation = Quaternion.Euler(0f, 0f, Mathf.Sin(Time.time * 50f) * 10f * shake);
+            yield return null;
+        }
+        foreach (var (t, _, _) in packets) if (t != null) Burst(t.position, 4, light, 0.6f, 0.02f);
+        Burst(mid, 30, red, 1.8f);
+        yield return Done(title, hint);
+    }
+
+    // ------------------------------------------------ research 5: 5G-SHARE, link the mast to each campus
+
+    private IEnumerator FiveGStation()
+    {
+        var tower = Model("Story/Tower5G", 1.65f, 0.9f, 0f);
+        tower.transform.position += Vector3.forward * 0.2f;
+        Bounds tb = GesturePlayer.GetBounds(Parts(tower));
+        Vector3 top = new Vector3(tb.center.x, tb.max.y - 0.1f, tb.center.z);
+        Vector2[] spots = { new Vector2(-0.92f, -0.45f), new Vector2(0.92f, -0.45f), new Vector2(-0.72f, 0.75f), new Vector2(0.72f, 0.75f) };
+        var hubs = new List<Vector3>();
+        foreach (var s in spots)
+        {
+            var hub = Model("Story/Hub", 0.38f, 0.5f, 0f);
+            hub.transform.position += new Vector3(s.x, 0f, s.y);
+            Bounds hb = GesturePlayer.GetBounds(Parts(hub));
+            hubs.Add(new Vector3(hb.center.x, hb.max.y, hb.center.z));
+        }
+        var title = Text("Phrase_5G", TextY);
+        var hint = Text("Hint_5G", HintY, true);
+
+        var linked = new bool[hubs.Count];
+        int links = 0, dragging = int.MinValue;
+        LineRenderer cable = null;
+        while (links < hubs.Count)
+        {
+            if (Idle()) { Clear(); yield break; }
+            if (TakeSkip()) break;
+            Vector2 mast = cam.WorldToScreenPoint(top), mastFoot = cam.WorldToScreenPoint(new Vector3(top.x, center.y, top.z));
+            foreach (var f in fingers)
+            {
+                if (f.began && dragging == int.MinValue && Mathf.Abs(f.pos.x - mast.x) < Screen.height * 0.08f && f.pos.y > mastFoot.y - 20f && f.pos.y < mast.y + Screen.height * 0.06f)
+                {
+                    dragging = f.id;
+                    cable = Line(red, 0.014f);
+                }
+                if (f.id != dragging || cable == null) continue;
+                Vector3 end = OnPlane(f.pos, top.z);
+                SetArc(cable, top, end, 0.15f);
+                if (!f.ended) continue;
+                int best = -1;
+                float bestD = Screen.height * 0.12f;
+                for (int i = 0; i < hubs.Count; i++)
+                {
+                    if (linked[i]) continue;
+                    float d = Vector2.Distance(f.pos, cam.WorldToScreenPoint(hubs[i]));
+                    if (d < bestD) { best = i; bestD = d; }
+                }
+                if (best >= 0)
+                {
+                    linked[best] = true;
+                    links++;
+                    SetArc(cable, top, hubs[best], 0.35f);
+                    StartCoroutine(Packets(top, hubs[best]));
+                    Burst(hubs[best], 16, red, 1.1f, 0.03f);
+                }
+                else Kill(cable.gameObject);
+                cable = null;
+                dragging = int.MinValue;
+            }
+            if (dragging != int.MinValue && !fingerById.ContainsKey(dragging)) { if (cable != null) Kill(cable.gameObject); cable = null; dragging = int.MinValue; }
+            yield return null;
+        }
+        for (int w = 0; w < 3; w++)   // the network is up: waves from the mast
+        {
+            var ring = Load("Story/Ring");
+            ring.transform.position = new Vector3(top.x, center.y + 0.02f, top.z);
+            StartCoroutine(Tween(1.2f, t => { if (ring != null) ring.transform.localScale = Vector3.one * Mathf.Max(0.001f, Mathf.Lerp(0.15f, 1.2f, t) * (1f - t * t)); }));
+            yield return new WaitForSeconds(0.35f);
+        }
+        yield return Done(title, hint);
+    }
+
     private LineRenderer Line(Material material, float width)
     {
         var go = new GameObject("Cable");
@@ -1377,6 +1626,28 @@ public class HoloLab : MonoBehaviour
             }
             yield return null;
         }
+    }
+
+    // ------------------------------------------------ the research path's end: AIRI and UTCN, join us
+
+    private IEnumerator ResearchEnd()
+    {
+        var airi = Model("Models/AIRI_Intro/AIRI_Intro", 0.7f, 1.0f, 1.0f);
+        airi.transform.position += Vector3.left * 0.55f;
+        var utcn = Model("Models/UTCN/UTCN", 0.7f, 1.0f, 1.0f);
+        utcn.transform.position += Vector3.right * 0.55f;
+        var title = Text("Phrase_JoinUs", TextY);
+        StartCoroutine(Confetti(Vector3.zero, 120, true));
+        lastTouch = Time.time;
+        float since = Time.time;
+        while (Time.time - lastTouch < 5f && Time.time - since < 15f && !TakeSkip())
+        {
+            foreach (var f in fingers)
+                if (f.began) StartCoroutine(Confetti(OnPlane(f.pos, center.z - 0.6f), 30, false));
+            yield return null;
+        }
+        TextOut(title);
+        yield return ShrinkAll(0.6f);
     }
 
     // ---------------------------------------------------------------- building blocks
@@ -1691,4 +1962,50 @@ public class HoloLab : MonoBehaviour
     }
 
     private static float Smooth(float t) => t * t * (3f - 2f * t);
+
+    // ---------------------------------------------------------------- the heart's ECG line
+
+    private class Ecg
+    {
+        private static readonly float[] Wave = { 0.06f, 0.1f, 0.06f, 0f, -0.12f, 1f, -0.38f, 0f, 0f, 0.1f, 0.18f, 0.22f, 0.16f, 0.06f };
+        private const int Samples = 110, PerSecond = 60;
+        private readonly LineRenderer line;
+        private readonly float[] values = new float[Samples];
+        private readonly Queue<float> next = new Queue<float>();
+        private readonly Vector3 left;
+        private readonly float width;
+        private float due;
+
+        public Ecg(HoloLab lab, Vector3 middle, float width)
+        {
+            this.width = width;
+            left = middle - Vector3.right * width * 0.5f;
+            var go = new GameObject("ECG");
+            lab.Track(go);
+            line = go.AddComponent<LineRenderer>();
+            line.sharedMaterial = lab.red;
+            line.positionCount = Samples;
+            line.widthMultiplier = 0.018f;
+            line.generateLightingData = true;   // lit like the rest
+            line.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            Tick(0f);
+        }
+
+        public void Beat(float strength)
+        {
+            next.Clear();
+            foreach (var v in Wave) next.Enqueue(v * strength);
+        }
+
+        public void Tick(float dt)
+        {
+            for (due += dt * PerSecond; due >= 1f; due -= 1f)
+            {
+                Array.Copy(values, 1, values, 0, Samples - 1);
+                values[Samples - 1] = next.Count > 0 ? next.Dequeue() : UnityEngine.Random.Range(-0.015f, 0.015f);
+            }
+            for (int i = 0; i < Samples; i++)
+                line.SetPosition(i, left + new Vector3(width * i / (Samples - 1f), values[i] * 0.2f, 0f));
+        }
+    }
 }
