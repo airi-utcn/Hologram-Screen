@@ -43,8 +43,12 @@ public class StoryDirector : MonoBehaviour
     [SerializeField] private float alcoveSpotDuringStory = 0.3f;
 
     // Layout above the floor, world units. The showcase frames objects up to about 4.5 above it.
-    private const float Mid = 1.55f;                                // where floating things sit
-    private const float TextY = 3.65f, TextHeight = 0.62f, TextWidth = 2.5f, TextForward = 0.6f; // headlines: compact, with air round them
+    // Heights are above the stage, which is Lift above the alcove floor: on the HLD the front ledge hides the lowest
+    // metre (the showcase objects hover by the same amount), and the ceiling band starts about 4.4 above the floor.
+    // Everything stays within about 2.4 units between the side walls.
+    private const float Lift = 1.0f;
+    private const float Mid = 1.25f;                                // where floating things sit, mid-frame
+    private const float TextY = 2.95f, TextHeight = 0.62f, TextWidth = 2.1f, TextForward = 0.6f; // headlines, under the ceiling band
     private const int SwarmSize = 80;
 
     private ObjectSwitcher switcher;
@@ -110,7 +114,10 @@ public class StoryDirector : MonoBehaviour
             if (edge != null && a != null && b != null) Link(edge, a.position, b.position, linksGrown);
     }
 
-    private void Play(bool health)
+    // SpotRecorder (Editor) starts a spot and records until it ends.
+    public bool Running => running;
+
+    public void Play(bool health)
     {
         Stop();
         running = true;
@@ -121,6 +128,7 @@ public class StoryDirector : MonoBehaviour
     private void Stop()
     {
         StopAllCoroutines();
+        FiveGLogo.Show(false);
         running = false;
         foreach (var go in spawned) if (go != null) Destroy(go);
         spawned.Clear();
@@ -128,7 +136,18 @@ public class StoryDirector : MonoBehaviour
         heart = hovering = null;
         if (dimmed && alcoveSpot != null) alcoveSpot.intensity = alcoveSpotIntensity;
         dimmed = false;
+        if (ledgeLook != null) ledgeLook.enabled = true;
+        ledgeLook = null;
+        if (floorLook != null) floorLook.enabled = true;
+        floorLook = null;
+        if (display != null && swayWas) display.Sway = true;
+        swayWas = false;
     }
+
+    private Renderer floorLook;
+    private bool swayWas;
+
+    private Renderer ledgeLook;
 
     private void OnDestroy() => Stop();
 
@@ -149,6 +168,15 @@ public class StoryDirector : MonoBehaviour
         if (display != null) display.HelpVisible = false;
         Measure();
         AddKeyLight();
+        var ledge = GameObject.Find("Ledge");
+        ledgeLook = ledge != null ? ledge.GetComponent<Renderer>() : null;
+        if (ledgeLook != null) ledgeLook.enabled = false;
+        // The mirror floor shows as a grey band on the HLD (and matte white turned grey too, under the dimmed spot), so
+        // it is not drawn while a spot plays; the models float, so nothing stands on it. The camera holds still.
+        var mirror = GameObject.Find("Mirror");
+        floorLook = mirror != null ? mirror.GetComponent<Renderer>() : null;
+        if (floorLook != null) floorLook.enabled = false;
+        if (display != null) { swayWas = display.Sway; display.Sway = false; }
         yield return health ? HealthSpot() : AiriSpot();
         Finish();
     }
@@ -258,6 +286,7 @@ public class StoryDirector : MonoBehaviour
         // 5G-SHARE: a mast links four partner campuses across Europe.
         yield return At(66.6f);
         var (network5G, alive5G) = FiveGShare();
+        FiveGLogo.Show(true);   // the project's logo in the corner while 5G-SHARE is on
         yield return Morph(previous, network5G, 0.9f);
         StartCoroutine(alive5G);
         yield return At(67.4f);
@@ -271,7 +300,8 @@ public class StoryDirector : MonoBehaviour
 
         // It all becomes AIRI and UTCN.
         yield return At(72.6f);
-        var logos = LogoPair(0.95f, 0.3f);
+        FiveGLogo.Show(false);
+        var logos = LogoPair(0.8f, 0.25f);
         yield return Morph(network5G, logos, 1.4f);
         StartCoroutine(Sway(logos, 10f, 0.3f, 10.2f));
         yield return At(73.4f);
@@ -292,7 +322,7 @@ public class StoryDirector : MonoBehaviour
     {
         yield return ("Dept_Micro", () =>
         {
-            var board = Hero("Story/Chip", 1.0f, Mid - 0.45f, 0f, 1.9f);
+            var board = Hero("Story/Chip", 1.0f, Mid - 0.45f, 0f, 1.7f);
             board.transform.RotateAround(Middle(board), Vector3.right, -50f); // tipped toward the viewer, so its face shows
             return (board, ChipAlive(board));
         });
@@ -310,8 +340,8 @@ public class StoryDirector : MonoBehaviour
         yield return ("Dept_Cyber", () =>
         {
             var padlock = Hero("Story/Padlock", 0.95f, Mid - 0.55f, 0f, 1.0f);
-            var sat = Hero("Story/Satellite", 0.35f, Mid + 0.2f, 0f, 0.9f, center.x + 0.9f, center.z);
-            return (Group("Cyber", padlock, sat), Both(Sway(padlock, 14f, 0.35f, 2.6f), CircleAround(sat, Middle(padlock), 0.95f)));
+            var sat = Hero("Story/Satellite", 0.3f, Mid + 0.2f, 0f, 0.7f, center.x + 0.75f, center.z);
+            return (Group("Cyber", padlock, sat), Both(Sway(padlock, 14f, 0.35f, 2.6f), CircleAround(sat, Middle(padlock), 0.75f)));
         });
         yield return ("Dept_Health", () =>
         {
@@ -332,7 +362,7 @@ public class StoryDirector : MonoBehaviour
         });
         yield return ("Dept_Immersive", () =>
         {
-            var vr = Hero("Story/VR", 1.0f, Mid - 0.45f, 0f, 1.9f);
+            var vr = Hero("Story/VR", 1.0f, Mid - 0.45f, 0f, 1.7f);
             return (vr, PopIn(vr, "Panel", 0.25f, true));
         });
         yield return ("Dept_Labelling", () =>
@@ -353,14 +383,14 @@ public class StoryDirector : MonoBehaviour
     // labelled with its country code.
     private (GameObject, IEnumerator) FiveGShare()
     {
-        var tower = Hero("Story/Tower5G", 1.75f, 0f, 0f, 1.0f, center.x, center.z + 0.2f);
+        var tower = Hero("Story/Tower5G", 1.65f, 0f, 0f, 0.9f, center.x, center.z + 0.2f);
         var parts = new List<GameObject> { tower };
         var hubs = new List<GameObject>();
         string[] codes = { "IE", "RO", "CZ", "IT" };
-        (float x, float z)[] spots = { (-1.15f, -0.55f), (1.15f, -0.55f), (-0.9f, 0.85f), (0.9f, 0.85f) }; // inside the alcove (half-width about 1.6)
+        (float x, float z)[] spots = { (-0.92f, -0.45f), (0.92f, -0.45f), (-0.72f, 0.75f), (0.72f, 0.75f) }; // between the walls
         for (int i = 0; i < 4; i++)
         {
-            var hub = Hero("Story/Hub", 0.42f, 0f, 0f, 0.62f, center.x + spots[i].x, center.z + spots[i].z);
+            var hub = Hero("Story/Hub", 0.38f, 0f, 0f, 0.5f, center.x + spots[i].x, center.z + spots[i].z);
             hubs.Add(hub);
             parts.Add(hub);
             var label = Load("Story/Code_" + codes[i], Quaternion.Euler(0f, 180f, 0f));
@@ -431,7 +461,7 @@ public class StoryDirector : MonoBehaviour
                 var ring = Load("Story/Ring", Quaternion.identity);
                 ring.transform.SetParent(group.transform, true);
                 Vector3 at = a;
-                StartCoroutine(Tween(1.3f, t => { if (ring != null) { ring.transform.position = at; ring.transform.localScale = Vector3.one * Mathf.Max(0.001f, Mathf.Lerp(0.15f, 1.6f, t) * (1f - t * t)); } }));
+                StartCoroutine(Tween(1.3f, t => { if (ring != null) { ring.transform.position = at; ring.transform.localScale = Vector3.one * Mathf.Max(0.001f, Mathf.Lerp(0.15f, 1.2f, t) * (1f - t * t)); } }));
                 StartCoroutine(Delayed(1.35f, Drop(ring)));
             }
             if (beacon != null) beacon.GetComponent<Renderer>().sharedMaterial = (time % 1f) < 0.5f ? red : dark;
@@ -726,7 +756,7 @@ public class StoryDirector : MonoBehaviour
         // It becomes the AIRI and UTCN logos, side by side.
         yield return At(15.4f);
         idle.RemoveAll(i => i.go == retina);
-        var logos = LogoPair(0.9f, 0.25f);
+        var logos = LogoPair(0.8f, 0.25f);
         yield return Morph(retina, logos, 1.6f);
         StartCoroutine(Sway(logos, 10f, 0.4f, 5.5f));
         yield return At(17.4f);
@@ -789,7 +819,7 @@ public class StoryDirector : MonoBehaviour
         float depth = PlayerPrefs.GetFloat("HLD_ObjectDepth", -1.5f); // GesturePlayer's shared W / S depth
         Vector3 spot = switcher.Spot;
         float floor = Physics.Raycast(spot + Vector3.up * 5f, Vector3.down, out var hit, 50f) ? hit.point.y : spot.y - 1f;
-        center = new Vector3(spot.x, floor, spot.z + depth);
+        center = new Vector3(spot.x, floor + Lift, spot.z + depth);
     }
 
     private Vector3 Floor(float height) => center + Vector3.up * height;
@@ -1057,15 +1087,15 @@ public class StoryDirector : MonoBehaviour
         campus.transform.position = center;
         spawned.Add(campus);
         plaza = Load("Story/Plaza", Quaternion.Euler(0f, 180f, 0f));
-        plaza.transform.localScale *= 1.55f;
+        plaza.transform.localScale *= 1.15f;
         plaza.transform.position = Floor(0.078f);
-        lab = Hero("Story/AIRI_Lab", 2.0f, 0.078f, 0f, 2.9f, center.x, center.z + 0.35f);
+        lab = Hero("Story/AIRI_Lab", 2.0f, 0.078f, 0f, 2.2f, center.x, center.z + 0.3f);
         props = new List<GameObject>();
-        foreach (var (x, z, s) in new[] { (-1.2f, -0.55f, 0.95f), (1.15f, -0.7f, 0.85f), (-0.7f, -1.05f, 0.75f), (0.75f, -1.1f, 0.8f),
-                                          (-1.38f, 0.1f, 0.85f), (1.4f, -0.05f, 0.9f), (-0.95f, -1.25f, 0.6f) })
-            props.Add(Hero("Story/Tree", 0.7f * s, 0.078f, (x * 47f + 360f) % 360f, null, center.x + x, center.z + z));
-        props.Add(Hero("Story/Lamp", 0.45f, 0.078f, 180f, null, center.x - 0.28f, center.z - 0.9f)); // arms over the path
-        props.Add(Hero("Story/Lamp", 0.45f, 0.078f, 0f, null, center.x + 0.28f, center.z - 0.9f));
+        foreach (var (x, z, s) in new[] { (-0.9f, -0.45f, 0.85f), (0.88f, -0.55f, 0.8f), (-0.55f, -0.8f, 0.7f), (0.58f, -0.85f, 0.75f),
+                                          (-1.02f, 0.15f, 0.8f), (1.02f, 0.05f, 0.85f), (-0.72f, -0.95f, 0.55f) })
+            props.Add(Hero("Story/Tree", 0.6f * s, 0.078f, (x * 47f + 360f) % 360f, null, center.x + x, center.z + z));
+        props.Add(Hero("Story/Lamp", 0.38f, 0.078f, 180f, null, center.x - 0.22f, center.z - 0.7f)); // arms over the path
+        props.Add(Hero("Story/Lamp", 0.38f, 0.078f, 0f, null, center.x + 0.22f, center.z - 0.7f));
         foreach (var go in new List<GameObject>(props) { lab, plaza }) go.transform.SetParent(campus.transform, true);
         foreach (var go in props) Scale(go, 0f);
         foreach (var part in Floors(lab)) part.gameObject.SetActive(false);

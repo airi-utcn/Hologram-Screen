@@ -5,7 +5,7 @@ using UnityEngine.InputSystem;
 /// Live alignment on the physical display: shifts and zooms the main camera so the virtual floor,
 /// shadow and reflection sit exactly on the real alcove floor. Values are saved between runs.
 /// Shift+Up/Down moves the scene, Shift+PageUp/PageDown zooms, Shift+Backspace resets. H shows all controls.
-/// Also rocks the view gently around the object (D toggles, [ ] strength) in a slow figure-8 of yaw and pitch:
+/// Also rocks the view gently from side to side around the object (D toggles, [ ] strength):
 /// near and far parts move at different speeds, which the eye reads as depth even on a flat image (kinetic depth effect).
 /// O/P lower/raise perspective: a wider lens from closer up, keeping the object the same size on screen, so its
 /// near parts grow against its far parts. The template's 15 degree telephoto lens flattens objects. Saved between runs.
@@ -53,6 +53,9 @@ public class DisplayAlignment : MonoBehaviour
         "Enter        AIRI x UTCN spot\n" +
         "M            AI for health spot (OCT retina)\n" +
         "Esc          skip to its end\n" +
+        "L            AIRI exhibit: opening + research\n" +
+        "             (or hold 4 fingers still 2 s)\n" +
+        "             N next step, wheel = spread\n" +
         "<- / ->      switch object\n" +
         "Tab          next experience (asteroids)\n" +
         "Drag         rotate   (1 finger / mouse)\n" +
@@ -85,6 +88,9 @@ public class DisplayAlignment : MonoBehaviour
         globalSway = sway;
         globalSwayAngle = swayAngle;
     }
+
+    // StoryDirector holds the camera still while a spot plays.
+    public bool Sway { get => sway; set => sway = value; }
 
     public void GetView(out bool swayOn, out float angle, out float lensWidening)
     {
@@ -198,9 +204,8 @@ public class DisplayAlignment : MonoBehaviour
         if (sway)
         {
             float t = Time.time * 2f * Mathf.PI / swayPeriod;
-            // Pitch at twice the yaw rate traces a figure-8, so the view also looks a little over and under.
-            Quaternion turn = Quaternion.AngleAxis(swayAngle * Mathf.Sin(t), Vector3.up)
-                            * Quaternion.AngleAxis(swayAngle * 0.5f * Mathf.Sin(2f * t), baseRotation * Vector3.right);
+            // Side to side only: the up-and-down part made the whole scene bob, which viewers found distracting.
+            Quaternion turn = Quaternion.AngleAxis(swayAngle * Mathf.Sin(t), Vector3.up);
             position = pivot + turn * (position - pivot);
             rotation = turn * baseRotation;
         }

@@ -52,6 +52,7 @@ Press **H** in the app to show them on screen.
 | Enter | play the AIRI × UTCN spot (83 s) |
 | M | play the AI for health spot with the OCT retina (22 s) |
 | Esc | skip the story to its end (the logos) |
+| L, or 4 fingers held still for 2 s | start or leave the AIRI exhibit (opening, then research by touch) |
 | Tab | next experience: model showcase ↔ asteroid orbits (VQ1 / VN3) |
 | ← / → | previous / next object |
 | Drag (finger or mouse) | turn (sideways) / tilt (up-down) |
@@ -68,7 +69,7 @@ Press **H** in the app to show them on screen.
 | 1–9 | play animation 1–9 (it loops) |
 | Space | pause / play the animation |
 | − / + / Backspace | slower / faster / normal speed |
-| D | camera sway (depth effect) on / off |
+| D | camera sway (depth effect, side to side) on / off |
 | [ / ] | less / more sway |
 | O / P | less / more perspective |
 | Shift + ↑ / ↓ | move the whole view up / down to line up with the physical floor (saved) |
@@ -127,6 +128,8 @@ The AIRI building is modelled on the architects' render: seven storeys wrapped i
 | 10–15 s | It keeps turning, the fluids pulsing | EARLY DETECTION. SAVED SIGHT. |
 | 15–22 s | It flows into the AIRI and UTCN logos, side by side on the floor | AIRI × UTCN |
 
+**Framing on the HLD** (measured on the display's own view): the front ledge hides the lowest metre above the alcove floor, the ceiling band starts about 4.4 above it, and there are about 2.4 units between the side walls. So the spots' stage starts 1 unit above the floor (like the showcase objects' hover; the shadows still fall on the floor below), everything that floats sits mid-frame, the headlines sit just under the ceiling band and are at most 2.1 wide, and every scene stays within the walls. While a spot plays the camera holds still (no sway), the template's **Ledge** is hidden, and the **Mirror** floor, which shows as a grey band on the HLD, is not drawn (the models float, so nothing stands on it; there are no floor shadows during the spots). All three come back afterwards.
+
 **Changing them:**
 - **Timings:** the `At(...)` cues in `AiriSpot()` / `HealthSpot()` in `StoryDirector.cs`.
 - **3D assets:** the headlines, the AIRI building (`lab()`), the department models (board, robot arm, drone, car, padlock, satellite, balance, gauge, VR headset, labelling set, server rack), the 5G mast and campus hubs, trees, lamps, lawn and the textures (`textures()`) are made by `SourceModels/Story/make_story_assets.py` (edit `PHRASES` for the wording) and installed by `SourceModels/Story/install_story.py`, which also creates the textured HDRP materials (`Resources/Story/Materials/Story*.mat`, textures in `Resources/Story/Textures`) and maps the models' materials onto them.
@@ -137,6 +140,53 @@ The AIRI building is modelled on the architects' render: seven storeys wrapped i
   ```bash
   python SourceModels/Story/install_story.py <out folder> .
   ```
+
+### Recording the spots for HLD Author (best quality)
+
+In the Unity Editor: **HLD → Record AIRI spot (2160x3840)** or **HLD → Record health spot (2160x3840)** (`Assets/Hololuminescent/Scripts/Editor/SpotRecorder.cs`). It enters Play mode, plays the spot and records it frame by frame at the display's own 2160 × 3840 portrait resolution as JPEG frames in `Recordings/<spot>/`, then stops by itself. Unity's own video encoders refuse 3840 px high, which is why it writes frames.
+- **Framing:** it uses the alignment saved by the built app on the HLD (registry `HKCU\Software\DefaultCompany\Hololuminescent`), not the Editor's own. It then widens the view (`StageShare`) so the objects have room. While recording, the ceiling band is hidden (it still casts its shadow) and the background past the alcove is white.
+- **Making the MP4:**
+  ```bash
+  blender -b --factory-startup -P SourceModels/Story/frames_to_video.py -- Recordings/AIRI_spot Recordings/AIRI_spot_HLD.mp4
+  ```
+  It writes a 2160 × 3840, 30 fps H.264 video. The app's near-white background becomes pure white (`--white`, default 0.97), other colours stay as rendered. `--top <px>` whitens a strip at the top, and `--frames <n>` keeps only the first n frames. Encoding 4K takes about 45 minutes.
+
+### Turning a recording into a video for HLD Author
+
+`SourceModels/Story/hld_video.py` turns a landscape screen recording of the app into a portrait video ready for [HLD Author](https://hldauthor.lookingglassfactory.com/):
+- It **crops** to the app's picture (the black bars and the window's edge go).
+- It places the picture on a **1080 × 1920 (9:16)** canvas on **pure white**: white is invisible on the HLD, and any grey shows as a dull wall.
+- It **grades** it: the app's light background becomes pure white, a gentle S-curve deepens shadows and shading, and saturation goes up a little.
+- It keeps the **sound** and writes an **H.264 MP4**.
+
+```bash
+blender -b --factory-startup -P SourceModels/Story/hld_video.py -- "<recording.mp4>" "<output.mp4>"
+```
+
+In HLD Author: **Videos → Import**, then **Export** for the display (HLD 27" / 86" for the Demo Media Player, or General / BrightSign). Its **Shadow** setting can add a grounding shadow too. The crop and scale values in the script were measured for a 1920 × 1080 recording with the app's picture in the middle; re-measure them for a recording of another size. If the recording opens on black (it would show as a black box on the HLD), add `--start <first frame with picture>`.
+
+## The AIRI exhibit: opening and research, by touch
+
+Press **L**, or hold **four fingers still for 2 seconds**, to start it or leave it (Esc leaves too). It is built at runtime by `Assets/Hololuminescent/Scripts/HoloLab.cs` from the showcase's models and the story's department models. Its 3D headlines and labels (`Lab_*`, `Hint_*`, `Label_*`, `Title_*`) come from `make_story_assets.py`.
+
+**The official opening** is also the resting state. It shows the AIRI building on its lawn with trees and lamps, and a red ribbon between two posts before the door: *Official opening*. A **swipe across the ribbon** cuts it:
+1. The halves swing down from the posts, the bow drops and confetti falls.
+2. **The red carpet rolls out** from the door toward the guests.
+3. *Welcome to AIRI* appears; a tap (or 12 s) moves on.
+
+**Explore AIRI research** is a carousel of seven research areas. **Swipe** to turn it; a flick keeps it going and it settles on one. Its name shows under the front exhibit, and a **tap** opens it. Every exhibit has **BACK** at the bottom. After a demonstration finishes, *Demonstration complete* shows and the carousel returns.
+
+| Exhibit | By touch |
+|---|---|
+| **AI for health** | The heart. Drag to turn it, spread two fingers to open it, tap a part to name it: valves (once open), heart wall, coronary vessels. |
+| **Robotics & IoT** | Drag sideways to turn the arm and down to lower it. It grips the crate when the hand reaches it; set the crate on the red pad. |
+| **Autonomous systems** | Draw a flight path with one finger; the drone flies it. |
+| **Cybersecurity** | Traffic flows to the padlock. Tap the red packets to intercept them and leave the graphite (legitimate) traffic alone; twelve fill the shield. |
+| **5G-SHARE** | Drag from the mast to each of the four campuses; data then runs along the links. |
+| **Digital twins** | The turbine. Circle the fan to run it up (the bar shows the run-up; hold it in the red for 3 s). Drag elsewhere to turn it and tap a part to name it. |
+| **Our guests** | *Where are you from?* Spin the globe and tap your home to drop a pin. Pins are **kept from guest to guest** (PlayerPrefs `HLD_LabPins`, the last 200). |
+
+An exhibit goes back to the carousel after 30 s without a touch, and the carousel goes back to the opening after 40 s. With a mouse (no touch screen), the wheel stands in for spreading two fingers, and **N** skips to the next step.
 
 ## Saving each object's look
 

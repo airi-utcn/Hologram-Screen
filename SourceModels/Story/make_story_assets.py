@@ -56,6 +56,70 @@ PHRASES = {
     "Phrase_Sees": "It sees what\nwe miss",
     "Phrase_Sight": "Early detection,\nsaved sight",
     "Phrase_AIRIxUTCN": "AIRI \u00d7 UTCN",
+    # Wake the Lab (HoloLab.cs): a task headline per station, its touch hint (tracked caps), and the line for done
+    "Lab_Wake": "Touch to wake\nthe lab",
+    "Lab_Heart": "Restart\nthe heart",
+    "Hint_Heart": "TAP WITH THE BEAT",
+    "Hint_Open": "SPREAD TWO FINGERS\nTO LOOK INSIDE",
+    "Lab_HeartDone": "It beats again",
+    "Lab_Engine": "Spin up\nthe engine",
+    "Hint_Engine": "DRAW CIRCLES\nAROUND THE FAN",
+    "Lab_EngineDone": "Full power",
+    "Lab_Orbit": "Catch\nthe moons",
+    "Hint_Orbit": "FLICK A MOON\nAROUND THE PLANET",
+    "Lab_OrbitDone": "Three moons\nin orbit",
+    "Lab_Horse": "Make it run",
+    "Hint_Horse": "SWIPE FAST\nMORE FINGERS, MORE SPEED",
+    "Lab_HorseDone": "Full gallop",
+    "Lab_Awake": "The lab\nis awake",
+    "Hint_Awake": "SPIN IT  SPREAD IT",
+    "Lab_Globe": "Where are\nyou from?",
+    "Hint_Globe": "SPIN THE GLOBE\nTAP YOUR HOME",
+    "Lab_GlobeDone": "Hello,\nworld",
+    "Lab_Build": "Raise\nthe institute",
+    "Hint_Build": "TAP TO RAISE\nEACH FLOOR",
+    "Lab_Ribbon": "Cut\nthe ribbon",
+    "Hint_Ribbon": "SWIPE ACROSS IT",
+    "Hint_Confetti": "TAP FOR CONFETTI",
+    # the menu after the opening, and the research path (headlines there are the department names, Dept_*)
+    "Lab_Menu": "Choose\nyour lab",
+    "Hint_Play": "PLAY THE LAB",
+    "Hint_Research": "AIRI RESEARCH",
+    "Hint_Arm": "DRAG TO MOVE THE ARM\nPUT THE BOX ON THE PAD",
+    "Hint_Drone": "DRAG TO FLY\nTHROUGH THE RINGS",
+    "Hint_Label": "TAP EACH OBJECT\nTO LABEL IT",
+    "Hint_Cyber": "TAP THE RED ATTACKS\nBEFORE THEY HIT",
+    "Hint_5G": "DRAG FROM THE MAST\nTO EACH CAMPUS",
+    "Lab_Done": "Well done",
+    # the exhibit (official version): opening, carousel, research exhibits, part names
+    "Lab_Opening": "Official\nopening",
+    "Hint_Cut": "SWIPE ACROSS THE RIBBON",
+    "Hint_Begin": "TOUCH TO EXPLORE",
+    "Lab_Explore": "Explore\nAIRI research",
+    "Hint_Browse": "SWIPE TO BROWSE   TAP TO OPEN",
+    "Hint_Back": "BACK",
+    "Hint_Complete": "DEMONSTRATION COMPLETE",
+    "Hint_Inspect": "DRAG TO TURN   SPREAD TO OPEN\nTAP A PART TO NAME IT",
+    "Hint_Turbine": "DRAG TO TURN   TAP A PART\nCIRCLE THE FAN TO RUN IT UP",
+    "Hint_Path": "DRAW A FLIGHT PATH\nTHE DRONE WILL FLY IT",
+    "Hint_Intercept": "TAP THE RED PACKETS\nTO INTERCEPT THEM",
+    "Title_Turbine": "Turbine\ndigital twin",
+    "Label_Health": "AI FOR HEALTH",
+    "Label_Robotics": "ROBOTICS & IoT",
+    "Label_Autonomous": "AUTONOMOUS SYSTEMS",
+    "Label_Cyber": "CYBERSECURITY",
+    "Label_5G": "5G-SHARE",
+    "Label_Turbine": "DIGITAL TWINS",
+    "Label_Guests": "OUR GUESTS",
+    "Label_Mitral": "MITRAL VALVE",
+    "Label_Tricuspid": "TRICUSPID VALVE",
+    "Label_Aortic": "AORTIC VALVE",
+    "Label_Pulmonary": "PULMONARY VALVE",
+    "Label_Wall": "HEART WALL",
+    "Label_Vessels": "CORONARY VESSELS",
+    "Label_Fan": "FAN",
+    "Label_Reverser": "THRUST REVERSER",
+    "Label_Casing": "ENGINE CASING",
 }
 
 
@@ -218,7 +282,7 @@ def make_phrase(name, body):
     separate objects L00, L01, ... in reading order, each with its origin in its middle."""
     clear()
     root = link(bpy.data.objects.new(name, None))
-    label = name.startswith(("Dept_", "Code_"))
+    label = name.startswith(("Dept_", "Code_", "Hint_", "Label_"))
     lines = body.split("\n")
     count = 0
     for k, line in enumerate(lines):
@@ -1146,7 +1210,7 @@ if __name__ == "__main__":
     print(f"Story assets -> {OUT}")
     for name, body in PHRASES.items():
         n = make_phrase(name, body)
-        expected = len(body.replace(" ", "").replace("\n", ""))  # one piece per character (i / j dots joined)
+        expected = len(body.replace(" ", "").replace("\n", "")) + body.count("?")  # a piece per character (i / j dots joined; a ? is two)
         assert n == expected, f"{name}: {n} pieces for {expected} characters (a letter split or merged)"
     ring()
     lab()

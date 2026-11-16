@@ -4,6 +4,7 @@ onto HDRP materials, and the generated textures, with materials that use them (c
     python install_story.py <folder make_story_assets.py wrote> <Unity project folder>
 """
 import os
+import re
 import shutil
 import sys
 import uuid
@@ -45,8 +46,9 @@ def material(name, rgb, base_map=None, normal_map=None, smoothness=None, metalli
         a, b = a.replace('\n', nl), b.replace('\n', nl)
         assert s.count(a) == 1, a
         s = s.replace(a, b)
-    for key in ('_BaseColor', '_Color'):
-        rep('    - %s: {r: 0.137, g: 0.122, b: 0.125, a: 1}' % key, '    - %s: {r: %s, g: %s, b: %s, a: 1}' % ((key,) + rgb))
+    for key in ('_BaseColor', '_Color'):   # any value: Unity re-saves them with float noise (0.13699996)
+        s, n = re.subn(r'    - %s: \{r: [^}]*\}' % key, '    - %s: {r: %s, g: %s, b: %s, a: 1}' % ((key,) + rgb), s)
+        assert n == 1, key
     if base_map:
         rep('    - _BaseColorMap:\n        m_Texture: {fileID: 0}', '    - _BaseColorMap:\n        m_Texture: {fileID: 2800000, guid: %s, type: 3}' % base_map)
         rep('    - _MainTex:\n        m_Texture: {fileID: 0}', '    - _MainTex:\n        m_Texture: {fileID: 2800000, guid: %s, type: 3}' % base_map)
