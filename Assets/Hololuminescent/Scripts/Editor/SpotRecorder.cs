@@ -141,7 +141,7 @@ public static class SpotRecorder
             var ceiling = GameObject.Find("Ceiling");
             if (ceiling != null)
                 foreach (var r in ceiling.GetComponentsInChildren<Renderer>())
-                    r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly;   // unseen, still shades like on the HLD
+                    r.enabled = false;   // unseen; it casts no shadow anyway (as shadow-only it shut out the spot above it)
             var cam = Camera.main != null ? Camera.main : Object.FindAnyObjectByType<Camera>();
             var hd = cam != null ? cam.GetComponent<UnityEngine.Rendering.HighDefinition.HDAdditionalCameraData>() : null;
             if (hd != null)

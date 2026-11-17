@@ -4,6 +4,7 @@
 
 2160 x 3840 portrait, 30 fps, H.264 at high quality, Standard view transform (colours as the app renders them), except:
 - --top: that many pixels at the top become white (the edge of the alcove's ceiling band; 26 px with StageShare 0.71),
+- --black: lifted blacks back down (a level that becomes black; the stretch also brings the contrast back),
 - --white: the app's near-white background (0.98-0.99 measured) and anything lighter become pure white, which is
   invisible on the HLD; any grey shows there as a dull wall. Default 0.97.
 """
@@ -16,6 +17,8 @@ args = sys.argv[sys.argv.index("--") + 1:]
 SRC, OUT = os.path.abspath(args[0]), os.path.abspath(args[1])   # Blender reads relative paths against the .blend, not the shell
 TOP = int(args[args.index("--top") + 1]) if "--top" in args else 0
 WHITE = float(args[args.index("--white") + 1]) if "--white" in args else 0.97
+# --black: this level and anything darker become black (frames recorded under the alcove's lifted shadows: 0.2).
+BLACK = float(args[args.index("--black") + 1]) if "--black" in args else 0.0
 files = sorted(f for f in os.listdir(SRC) if f.lower().endswith((".jpg", ".jpeg", ".png")))
 if "--frames" in args:                   # keep only the first N (drops a tail recorded after the spot ended)
     files = files[:int(args[args.index("--frames") + 1])]
@@ -42,6 +45,8 @@ curves = seq.modifiers.new("White point", "CURVES")
 c = curves.curve_mapping.curves[3]       # the combined curve (the modifier ignores curve_mapping.white_level)
 c.points[1].location = (1.0, 1.0)
 c.points.new(WHITE, 1.0)
+if BLACK > 0.0:
+    c.points.new(BLACK, 0.0)
 for p in c.points:
     p.handle_type = "VECTOR"             # straight segments: a smooth curve bows up and washes out the mid-tones
 curves.curve_mapping.update()

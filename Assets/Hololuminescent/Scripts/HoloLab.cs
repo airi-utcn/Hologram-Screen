@@ -8,7 +8,8 @@ using UnityEngine.SceneManagement;
 /// <summary>
 /// The AIRI exhibit for the HLD: an official opening, then the institute's research to explore by touch. Built at runtime
 /// from the showcase's models, the story's department models and the 3D headlines (SourceModels/Story/
-/// make_story_assets.py: Lab_*, Hint_*, Label_*). L, or four fingers held still for 2 s, starts or leaves it; README.md
+/// make_story_assets.py: Lab_*, Hint_*, Label_*). Numpad 6 (SceneSwitcher), or four fingers held still for 2 s, starts it;
+/// Esc or the four fingers again leave it. README.md
 /// ("The AIRI exhibit") walks through it.
 ///
 /// Opening (also the resting state): the AIRI building, a red ribbon before the door. A swipe across cuts it: the halves
@@ -161,11 +162,16 @@ public class HoloLab : MonoBehaviour
         alcoveSpot = spot != null ? spot.GetComponent<Light>() : null;
     }
 
+    public void Begin()
+    {
+        if (!running && (story == null || !story.Running)) StartCoroutine(Enter());
+    }
+
     private void Update()
     {
         ReadFingers();
         var keyboard = Keyboard.current;
-        bool toggle = keyboard != null && keyboard.lKey.wasPressedThisFrame;
+        bool toggle = false;   // numpad 6 starts it through SceneSwitcher (Begin), from any experience
 
         // Four fingers held still for 2 s: the way in and out on the display, with no keyboard.
         bool still = Held() >= 4;
@@ -191,7 +197,7 @@ public class HoloLab : MonoBehaviour
         if (display != null) { display.HelpVisible = false; swayWas = display.Sway; display.Sway = false; }
         Measure();
         AddKeyLight();
-        AddGrade();
+        StageGrade.Show(true);
         var ledge = GameObject.Find("Ledge");
         ledgeLook = ledge != null ? ledge.GetComponent<Renderer>() : null;
         if (ledgeLook != null) ledgeLook.enabled = false;
@@ -213,8 +219,7 @@ public class HoloLab : MonoBehaviour
             Destroy(keyLight);
         }
         keyLight = null;
-        if (grade != null) Destroy(grade);
-        grade = null;
+        StageGrade.Show(false);
         if (ledgeLook != null) ledgeLook.enabled = true;
         if (floorLook != null) floorLook.enabled = true;
         ledgeLook = floorLook = null;
@@ -250,23 +255,6 @@ public class HoloLab : MonoBehaviour
         l.intensity = alcoveSpotIntensity;
         l.shadows = LightShadows.Soft;
         alcoveSpot.intensity = alcoveSpotIntensity * 0.3f;
-    }
-
-    // Livelier colours while the exhibit runs: the alcove's grade left the models looking washed out. Only saturation and
-    // contrast; white stays white (contrast only pushes it further up).
-    private GameObject grade;
-
-    private void AddGrade()
-    {
-        grade = new GameObject("Lab Grade");
-        var volume = grade.AddComponent<UnityEngine.Rendering.Volume>();
-        volume.isGlobal = true;
-        volume.priority = 100f;
-        var profile = ScriptableObject.CreateInstance<UnityEngine.Rendering.VolumeProfile>();
-        var colour = profile.Add<UnityEngine.Rendering.HighDefinition.ColorAdjustments>(true);
-        colour.saturation.Override(35f);
-        colour.contrast.Override(12f);
-        volume.sharedProfile = profile;
     }
 
     // ---------------------------------------------------------------- the exhibit
@@ -636,11 +624,11 @@ public class HoloLab : MonoBehaviour
     // Back to the carousel: BACK, 30 s without a touch, or N.
     private bool Leaving() => Time.time - lastTouch > ExhibitIdleSeconds || BackTapped() || TakeSkip();
 
-    // The demonstration is done: the hint turns into "Demonstration complete".
+    // The demonstration is done: the hint goes.
     private GameObject Completed(GameObject hint)
     {
         TextOut(hint);
-        return Text("Hint_Complete", HintY, true);
+        return null;
     }
 
     private IEnumerator Close(params GameObject[] texts)
@@ -656,6 +644,7 @@ public class HoloLab : MonoBehaviour
     {
         public Transform pivot;
         public Vector2 spin = new Vector2(12f, 0f);
+        public bool hold;
         public float explode, pinch0 = -1f, side;
         public GameObject label;
         public Renderer target;
@@ -665,7 +654,9 @@ public class HoloLab : MonoBehaviour
     private void Inspect(Inspector s, Action<float> open, Renderer[] parts, Func<Renderer, string> nameOf, bool turn = true)
     {
         float dt = Mathf.Max(Time.deltaTime, 1e-4f);
-        if (turn && Held() == 1 && !fingers[0].began)
+        if (s.hold)   // held still (the turbine while its fan is run up); the slow turn comes back gently afterwards
+            s.spin = Vector2.zero;
+        else if (turn && Held() == 1 && !fingers[0].began)
             s.spin = Vector2.Lerp(s.spin, new Vector2(-fingers[0].delta.x, fingers[0].delta.y) / dt / Screen.height * 180f, 0.5f);
         else
             s.spin = Vector2.Lerp(s.spin, new Vector2(12f, 0f), dt * 0.8f);
@@ -741,18 +732,36 @@ public class HoloLab : MonoBehaviour
         var engine = Model("Models/Engine/source/engine_sk", 1.25f, 1.9f, 0.75f);
         Transform rotor = FindPart(engine.transform, "ROTOR");
         var rotorLook = rotor != null ? rotor.GetComponent<Renderer>() : null;
-        if (rotorLook != null)   // the fan toward the viewer, a little from the side
+        if (rotorLook != null)   // the fan to the right: the slow turn brings it round to face the viewer straight away
         {
             Vector3 toFan = rotorLook.bounds.center - Middle(engine);
             toFan.y = 0f;
-            engine.transform.RotateAround(Middle(engine), Vector3.up, Vector3.SignedAngle(toFan, Quaternion.Euler(0f, 35f, 0f) * Vector3.back, Vector3.up));
+            engine.transform.RotateAround(Middle(engine), Vector3.up, Vector3.SignedAngle(toFan, Vector3.right, Vector3.up));
             Fit(engine, 1.25f, 1.9f, 0.75f);
         }
         var pivot = Pivot(engine);
         Vector3 mid = pivot.position;
         Vector3 fan = rotorLook != null ? rotorLook.bounds.center : mid;
-        Vector3 fanLocal = pivot.InverseTransformPoint(fan), axisLocal = pivot.InverseTransformDirection((fan - mid).normalized);
+        Vector3 fanLocal = pivot.InverseTransformPoint(fan);
         var parts = Parts(engine);
+        // The exhaust leaves the back of the engine: the fan was just turned to the right, so the back is on the left.
+        Bounds eb = GesturePlayer.GetBounds(parts);
+        Vector3 rearLocal = pivot.InverseTransformPoint(new Vector3(eb.min.x + 0.05f, fan.y, fan.z));
+        Vector3 backLocal = pivot.InverseTransformDirection(Vector3.left);
+        var streaks = new List<(Transform t, Vector3 v, float life)>();
+
+        // The fan's hub and axis, kept in the rotor's own space so they stay right however the engine is turned. The engine
+        // was just turned with its fan to the right, so its long axis, the fan's axis, is the world's right at this moment.
+        // (The line from the engine's middle to the fan tilts, the pylon on top lifting the middle, and the fan wobbled;
+        // the file's own "Fan" clip did not play through a PlayableGraph here.)
+        bool spins = rotor != null && rotorLook != null;
+        Vector3 hub = spins ? rotor.InverseTransformPoint(rotorLook.bounds.center) : Vector3.zero;
+        Vector3 spinAxis = spins ? rotor.InverseTransformDirection(Vector3.right).normalized : Vector3.right;
+        // Explicitly, from the rest pose each frame (to the hub, turn, back): nothing accumulates, so it cannot drift.
+        Vector3 restPosition = spins ? rotor.localPosition : Vector3.zero;
+        Quaternion restRotation = spins ? rotor.localRotation : Quaternion.identity;
+        Vector3 hubScaled = spins ? Vector3.Scale(rotor.localScale, hub) : Vector3.zero;   // the hub in the parent's units
+        float fanAngle = 0f;
         string Name(Renderer r) => r.name.Contains("ROTOR") ? "Label_Fan" : r.name.Contains("PUSH") ? "Label_Reverser" : "Label_Casing";
         var title = Text("Title_Turbine", TextY);
         var hint = Text("Hint_Turbine", HintY, true);
@@ -761,7 +770,7 @@ public class HoloLab : MonoBehaviour
         const float zone = 0.75f;
         var look = new Inspector { pivot = pivot };
         var circling = new HashSet<int>();
-        float power = 0f, inZone = 0f, doneAt = -1f;
+        float power = 0f, inZone = 0f, doneAt = -1f, lastCircle = -10f;
         while (!Leaving() && (doneAt < 0f || Time.time - doneAt < 6f))
         {
             float dt = Time.deltaTime;
@@ -776,11 +785,36 @@ public class HoloLab : MonoBehaviour
                 Vector2 a = f.pos - f.delta - c, b = f.pos - c;
                 if (a.magnitude > 8f && b.magnitude > 8f) power += Mathf.Abs(Vector2.SignedAngle(a, b)) / 360f * 0.16f;
             }
+            if (circling.Count > 0) lastCircle = Time.time;
+            look.hold = Time.time - lastCircle < 0.7f;   // the engine stays put while the fan is spun, and 0.7 s after
             Inspect(look, null, parts, Name, circling.Count == 0);
             power = Mathf.Clamp(power - dt * 0.1f * (0.5f + power), 0f, 1.15f);
             if (power >= zone) inZone += dt;
             Fill(gauge, power, zone);
-            if (rotor != null) rotor.RotateAround(fanNow, pivot.TransformDirection(axisLocal), power * 7f * 360f * dt);
+            if (spins)   // a slow idle turn, up to 7 turns a second at full power
+            {
+                fanAngle = Mathf.Repeat(fanAngle + Mathf.Lerp(0.3f, 7f, Mathf.Clamp01(power)) * 360f * dt, 360f);
+                Quaternion turned = restRotation * Quaternion.AngleAxis(fanAngle, spinAxis);
+                rotor.localRotation = turned;
+                rotor.localPosition = restPosition + restRotation * hubScaled - turned * hubScaled;   // the hub stays put
+            }
+            if (power > 0.25f && UnityEngine.Random.value < power * 0.9f)   // the air blown out of the back
+            {
+                var s = Prim(PrimitiveType.Cube, "Exhaust", light, false);
+                Vector3 back = pivot.TransformDirection(backLocal);
+                s.transform.position = pivot.TransformPoint(rearLocal) + UnityEngine.Random.insideUnitSphere * 0.12f;
+                s.transform.rotation = Quaternion.LookRotation(back);
+                s.transform.localScale = new Vector3(0.012f, 0.012f, 0.12f + 0.25f * power);
+                streaks.Add((s.transform, back * (1.5f + 3f * power), 0.45f));
+            }
+            for (int i = streaks.Count - 1; i >= 0; i--)
+            {
+                var (t, v, life) = streaks[i];
+                life -= dt;
+                if (t == null || life <= 0f) { if (t != null) Kill(t.gameObject); streaks.RemoveAt(i); continue; }
+                t.position += v * dt;
+                streaks[i] = (t, v, life);
+            }
             if (doneAt < 0f && inZone >= 3f) { doneAt = Time.time; hint = Completed(hint); }
             yield return null;
         }
@@ -840,11 +874,13 @@ public class HoloLab : MonoBehaviour
         float reachGrip = Vector3.Distance(wrist.position, crate.position) + 0.12f;
         Pose(0f, 0f, 0f);
         var pad = Prim(PrimitiveType.Cylinder, "Pad", red);
-        pad.transform.localScale = new Vector3(0.3f, 0.006f, 0.3f);
+        pad.transform.localScale = new Vector3(0.42f, 0.006f, 0.42f);
         pad.transform.position = padAt;
+        float floorY = center.y + 0.3f;
+        Bounds CrateBounds() => GesturePlayer.GetBounds(crate.GetComponentsInChildren<Renderer>());
 
         float yawNow = 0f, reachNow = 0f, close = 0f, doneAt = -1f;
-        bool holding = false;
+        bool holding = false, lifted = false;
         while (!Leaving() && (doneAt < 0f || Time.time - doneAt < 6f))
         {
             if (Held() == 1 && doneAt < 0f)
@@ -856,24 +892,32 @@ public class HoloLab : MonoBehaviour
             if (doneAt >= 0f) reachNow = Mathf.MoveTowards(reachNow, 0f, Time.deltaTime);
             close = Mathf.MoveTowards(close, holding ? 1f : 0f, Time.deltaTime * 4f);
             Pose(yawNow, reachNow, close);
-            if (!holding && doneAt < 0f && reachNow > 0.75f && Vector3.Distance(wrist.position, crate.position) < reachGrip)
+            if (!holding && doneAt < 0f && reachNow > 0.6f)   // the hand down over the crate: it grips
             {
-                holding = true;
-                crate.SetParent(wrist, true);
+                Bounds cb = CrateBounds();
+                Vector2 over = new Vector2(wrist.position.x - cb.center.x, wrist.position.z - cb.center.z);
+                if (over.magnitude < 0.22f || Vector3.Distance(wrist.position, crate.position) < reachGrip)
+                {
+                    holding = true;
+                    lifted = false;
+                    crate.SetParent(wrist, true);
+                }
             }
-            Vector2 flat = new Vector2(crate.position.x - padAt.x, crate.position.z - padAt.z);
-            if (holding && reachNow > 0.5f && flat.magnitude < 0.2f)
+            if (holding && reachNow < 0.4f) lifted = true;
+            bool overPad = holding && new Vector2(crate.position.x - padAt.x, crate.position.z - padAt.z).magnitude < 0.32f;
+            pad.transform.localScale = new Vector3(0.42f, 0.006f, 0.42f) * (overPad ? 1f + 0.12f * Mathf.Sin(Time.time * 10f) : 1f);
+            if (holding && lifted && reachNow > 0.55f)   // lifted, then lowered again: it is set down below the hand
             {
                 holding = false;
                 crate.SetParent(arm.transform, true);
-                var crateParts = crate.GetComponentsInChildren<Renderer>();
-                if (crateParts.Length > 0)
+                Bounds cb = CrateBounds();
+                Vector3 at = overPad ? padAt : new Vector3(cb.center.x, floorY, cb.center.z);   // near the pad it lands on it
+                crate.position += new Vector3(at.x - cb.center.x, at.y + 0.005f - cb.min.y, at.z - cb.center.z);
+                if (overPad)
                 {
-                    Bounds b = GesturePlayer.GetBounds(crateParts);
-                    crate.position += new Vector3(padAt.x - b.center.x, padAt.y + 0.005f - b.min.y, padAt.z - b.center.z);
+                    doneAt = Time.time;
+                    hint = Completed(hint);
                 }
-                doneAt = Time.time;
-                hint = Completed(hint);
             }
             yield return null;
         }
@@ -1624,6 +1668,7 @@ public class HoloLab : MonoBehaviour
         float size = name.StartsWith("Hint_") ? 0.15f : name.StartsWith("Dept_") ? 0.22f : 0.38f;
         var go = Load("Story/" + name);
         var parts = Parts(go);
+        foreach (var r in parts) r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;   // only objects throw shadows
         if (parts.Length == 0) return go;
         Bounds b = GesturePlayer.GetBounds(parts);
         go.transform.localScale *= Mathf.Min(size, width / b.size.x, (hint ? 0.36f : 0.62f) / b.size.y);

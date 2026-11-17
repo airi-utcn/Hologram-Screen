@@ -91,11 +91,44 @@ public class GesturePlayer : MonoBehaviour
 
     // For models added at runtime: set before the first frame, Start applies it.
     public float FitHeight { set => fitHeight = value; }
+    public float HeightOffset { get => heightOffset; set => heightOffset = value; }
     public float Heartbeat { set => heartbeat = value; }
     public bool Spin { set => spin = value; }
     public SpinAxis Axis { set => spinAxis = value; }
     public bool UprightOnly { set => uprightOnly = value; }
     public float ShiftX { set => shiftX = value; }
+
+    // Observers may pause presentation animation without changing the existing controls.
+    public event System.Action Interacting;
+    public event System.Action ControlsUpdated;
+
+    public System.Action CapturePoseRestorer()
+    {
+        Vector3 position = transform.localPosition, scale = transform.localScale;
+        Quaternion rotation = transform.localRotation;
+        float savedFloor = floorY, savedHeight = height, savedDepth = depth, savedLift = lift;
+        bool savedSpin = spin;
+        SpinAxis savedAxis = spinAxis;
+        bool hadSharedDepth = PlayerPrefs.HasKey(DepthKey);
+        float sharedDepth = PlayerPrefs.GetFloat(DepthKey, defaultDepth);
+        return () =>
+        {
+            if (this == null) return;
+            transform.localPosition = position;
+            transform.localRotation = rotation;
+            transform.localScale = scale;
+            floorY = savedFloor;
+            height = savedHeight;
+            depth = savedDepth;
+            lift = savedLift;
+            lastPinch = 0f;
+            spin = savedSpin;
+            spinAxis = savedAxis;
+            if (hadSharedDepth) PlayerPrefs.SetFloat(DepthKey, sharedDepth);
+            else PlayerPrefs.DeleteKey(DepthKey);
+            PlayerPrefs.Save();
+        };
+    }
 
     public enum SpinAxis { Y, X, Z }
 
@@ -291,17 +324,24 @@ public class GesturePlayer : MonoBehaviour
         // events, so the mouse is ignored while any finger is down to avoid doing everything twice.
         var touch = Touchscreen.current;
         int fingers = 0;
+        bool touchReleased = false;
         Vector2 a = default, b = default, dragDelta = default;
         if (touch != null)
         {
             foreach (var t in touch.touches)
             {
+                touchReleased |= t.press.wasReleasedThisFrame;
                 if (!t.press.isPressed) continue;
                 if (fingers == 0) { a = t.position.ReadValue(); dragDelta = t.delta.ReadValue(); }
                 else if (fingers == 1) b = t.position.ReadValue();
                 fingers++;
             }
         }
+
+        var pointerMouse = Mouse.current;
+        if (fingers > 0 || touchReleased || (pointerMouse != null &&
+            (pointerMouse.leftButton.isPressed || pointerMouse.leftButton.wasReleasedThisFrame || pointerMouse.scroll.ReadValue().y != 0f)))
+            Interacting?.Invoke();
 
         float scale = 1f;
         if (fingers >= 2)
@@ -356,6 +396,7 @@ public class GesturePlayer : MonoBehaviour
     private void Update()
     {
         var keyboard = Keyboard.current;
+        if (HasPoseKeyboardInput(keyboard)) Interacting?.Invoke();
         if (keyboard != null && keyboard.rKey.wasPressedThisFrame)
             spin = !spin;
         if (keyboard != null && keyboard.aKey.wasPressedThisFrame && !uprightOnly)
@@ -408,6 +449,8 @@ public class GesturePlayer : MonoBehaviour
             }
         }
 
+        ControlsUpdated?.Invoke();
+
         // Y: the object's own upright axis (it follows the tilt, so the tilt keeps facing the viewer);
         // X / Z: the screen's left-right and in-out axes. Always through the object's middle, so it turns in place.
         if (spin)
@@ -424,7 +467,7 @@ public class GesturePlayer : MonoBehaviour
         {
             for (int i = 0; i < Mathf.Min(9, ClipCount); i++)
             {
-                if (keyboard[Key.Digit1 + i].wasPressedThisFrame || keyboard[Key.Numpad1 + i].wasPressedThisFrame)
+                if (keyboard[Key.Digit1 + i].wasPressedThisFrame)   // the numpad picks the experience (SceneSwitcher)
                     Play(i);
             }
 
@@ -445,6 +488,19 @@ public class GesturePlayer : MonoBehaviour
         // With a single clip this restarts it, so non-looping takes still repeat.
         if (autoCycle && ClipCount > 0 && !paused && Time.time >= nextSwitchTime)
             Play((current + 1) % ClipCount);
+    }
+
+    private bool HasPoseKeyboardInput(Keyboard keyboard)
+    {
+        if (keyboard == null) return false;
+        if (keyboard.rKey.wasPressedThisFrame || (!uprightOnly && keyboard.aKey.wasPressedThisFrame)) return true;
+        if (keyboard.ctrlKey.isPressed)
+            return keyboard.leftArrowKey.isPressed || keyboard.rightArrowKey.isPressed
+                || keyboard.upArrowKey.isPressed || keyboard.downArrowKey.isPressed;
+        if (keyboard.shiftKey.isPressed) return false;
+        return keyboard.qKey.isPressed || keyboard.eKey.isPressed || keyboard.wKey.isPressed || keyboard.sKey.isPressed
+            || keyboard.wKey.wasReleasedThisFrame || keyboard.sKey.wasReleasedThisFrame
+            || (!uprightOnly && (keyboard.upArrowKey.isPressed || keyboard.downArrowKey.isPressed));
     }
 
     private void Play(int index)

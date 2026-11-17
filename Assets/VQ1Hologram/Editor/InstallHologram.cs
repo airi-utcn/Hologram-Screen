@@ -38,9 +38,9 @@ namespace VQ1Hologram.Editor
             // Keep the alcove camera transform, FOV, mirror and clipping calibration.
             var obj=new GameObject("NEARBY • VQ1 + VN3");
             var show=obj.AddComponent<HologramExperience>();
-            show.cyan=MakeMaterial("Ion Cyan",new Color(.08f,.65f,1),1.4f);
-            show.amber=MakeMaterial("Solar Amber",new Color(1,.36f,.05f),1.4f);
-            show.ice=MakeMaterial("Ice",new Color(.65f,.85f,1),.4f);
+            show.cyan=MakeMaterial("Ion Cyan",new Color32(0,90,156,255),.4f);
+            show.amber=MakeMaterial("Solar Amber",new Color32(166,61,0,255),.4f);
+            show.ice=MakeMaterial("Ice",new Color32(31,41,55,255),.1f);
             show.dim=MakeMaterial("Faint Cyan",new Color(.015f,.09f,.13f),.1f);
             show.rockSurface=MakeMaterial("Asteroid Surface",new Color(.025f,.07f,.10f),.1f);
             show.font=MakeFont();
@@ -61,7 +61,7 @@ namespace VQ1Hologram.Editor
             Selection.activeGameObject=obj;
             Debug.Log("VQ1 ready. Press Play. Automatic 80-second loop, H for operator controls. Keep original alcove alignment; verify on physical hardware.");
         }
-        [MenuItem("Tools/VQ1 Hologram/Repair white screen in open scene")]
+        [MenuItem("Tools/VQ1 Hologram/Apply white background in open scene")]
         public static void RepairWhiteScreen()
         {
             if(EditorApplication.isPlaying)
@@ -90,20 +90,20 @@ namespace VQ1Hologram.Editor
             EditorUtility.SetDirty(profile);EditorUtility.SetDirty(target);
             EditorSceneManager.MarkSceneDirty(show.gameObject.scene);
             EditorSceneManager.SaveScene(show.gameObject.scene);AssetDatabase.SaveAssets();
-            Debug.Log("VQ1 display repaired: black camera clear, sky disabled, fixed EV12, black outside mask. Press Play to verify.");
+            Debug.Log("VQ1 display configured: white camera clear, sky disabled, fixed EV12, bloom off, white outside mask. Press Play to verify.");
         }
         static void ConfigureCamera(Camera cam)
         {
-            cam.tag="MainCamera";cam.clearFlags=CameraClearFlags.SolidColor;cam.backgroundColor=Color.black;
+            cam.tag="MainCamera";cam.clearFlags=CameraClearFlags.SolidColor;cam.backgroundColor=Color.white;
             var hd=cam.GetComponent<HDAdditionalCameraData>();
-            if(hd){hd.clearColorMode=HDAdditionalCameraData.ClearColorMode.Color;hd.backgroundColorHDR=Color.black;EditorUtility.SetDirty(hd);}
+            if(hd){hd.clearColorMode=HDAdditionalCameraData.ClearColorMode.Color;hd.backgroundColorHDR=Color.white;EditorUtility.SetDirty(hd);}
             EditorUtility.SetDirty(cam);
         }
         static T GetOrAdd<T>(VolumeProfile profile) where T:VolumeComponent
         {return profile.TryGet<T>(out var component)?component:profile.Add<T>(false);}
         static void ConfigureProfile(VolumeProfile profile)
         {
-            var bloom=GetOrAdd<Bloom>(profile);bloom.intensity.Override(.17f);bloom.threshold.Override(1.1f);
+            var bloom=GetOrAdd<Bloom>(profile);bloom.intensity.Override(0f);bloom.threshold.Override(1.1f);
             // The source template has HDRI exposure +14.6 and powerful studio lights.
             // A fixed EV0 override washes out the sky and alcove. Emissive hologram
             // materials already have exposure weight zero, so retain their visibility.
@@ -112,9 +112,8 @@ namespace VQ1Hologram.Editor
             var environment=GetOrAdd<VisualEnvironment>(profile);environment.skyType.Override(0);
             var fog=GetOrAdd<Fog>(profile);fog.enabled.Override(false);
             var tonemap=GetOrAdd<Tonemapping>(profile);tonemap.mode.Override(TonemappingMode.ACES);
-            // Keep the template mask's enable state and dimensions, but avoid its
-            // default white fill if the installation enables clipping.
-            var mask=GetOrAdd<global::SDFCubeMaskVolume>(profile);mask.outsideColor.Override(Color.black);
+            // Match the white camera background when clipping is enabled.
+            var mask=GetOrAdd<global::SDFCubeMaskVolume>(profile);mask.outsideColor.Override(Color.white);
         }
         static Material MakeMaterial(string name,Color color,float emission)
         {

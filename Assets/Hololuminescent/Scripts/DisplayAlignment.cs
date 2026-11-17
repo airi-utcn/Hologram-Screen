@@ -14,7 +14,6 @@ public class DisplayAlignment : MonoBehaviour
 {
     [SerializeField] private float moveStep = 0.05f;
     [SerializeField] private float zoomStep = 0.25f;
-    [SerializeField] private bool showHelpOnStart = true;
 
     [Header("Depth sway")]
     [SerializeField] private bool sway = true;
@@ -53,11 +52,16 @@ public class DisplayAlignment : MonoBehaviour
         "Enter        AIRI x UTCN spot\n" +
         "M            AI for health spot (OCT retina)\n" +
         "Esc          skip to its end\n" +
-        "L            AIRI exhibit: opening + research\n" +
-        "             (or hold 4 fingers still 2 s)\n" +
+        "4 fingers    AIRI exhibit (hold still 2 s)\n" +
         "             N next step, wheel = spread\n" +
         "<- / ->      switch object\n" +
         "Tab          next experience (asteroids)\n" +
+        "Numpad 1     planet and asteroids\n" +
+        "Numpad 2/3   AIRI spot / health spot\n" +
+        "Numpad 4     showcase, every object as saved\n" +
+        "Numpad 5     ChemiNova (shoe + Palchetto)\n" +
+        "Numpad 6     AIRI exhibit (opening + research)\n" +
+        "Numpad 7     touch games (heart, horse, moons...)\n" +
         "Drag         rotate   (1 finger / mouse)\n" +
         "Pinch        resize   (2 fingers / wheel)\n\n" +
         "1 - 9        pick animation (loops)\n" +
@@ -123,7 +127,7 @@ public class DisplayAlignment : MonoBehaviour
         pivotDistance = target != null ? Vector3.Dot(target.transform.position - basePosition, cam.transform.forward) : 20f;
         offsetY = PlayerPrefs.GetFloat(OffsetKey, 0f);
         fovDelta = PlayerPrefs.GetFloat(ZoomKey, 0f);
-        showHelp = showHelpOnStart;
+        showHelp = false;   // the controls box starts hidden (on the display it covered the picture); H shows it
     }
 
     private void Update()

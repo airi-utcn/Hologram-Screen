@@ -197,15 +197,15 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1937653944517141470, guid: b96741434df4f08409c6035404151fe2, type: 3}
       propertyPath: backgroundColorHDR.b
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 1937653944517141470, guid: b96741434df4f08409c6035404151fe2, type: 3}
       propertyPath: backgroundColorHDR.g
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 1937653944517141470, guid: b96741434df4f08409c6035404151fe2, type: 3}
       propertyPath: backgroundColorHDR.r
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 3005404773025202165, guid: b96741434df4f08409c6035404151fe2, type: 3}
       propertyPath: m_LocalPosition.x
@@ -257,15 +257,15 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6772204346468728009, guid: b96741434df4f08409c6035404151fe2, type: 3}
       propertyPath: m_BackGroundColor.b
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 6772204346468728009, guid: b96741434df4f08409c6035404151fe2, type: 3}
       propertyPath: m_BackGroundColor.g
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 6772204346468728009, guid: b96741434df4f08409c6035404151fe2, type: 3}
       propertyPath: m_BackGroundColor.r
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 6869618719667365104, guid: b96741434df4f08409c6035404151fe2, type: 3}
       propertyPath: m_Version

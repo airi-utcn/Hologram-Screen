@@ -79,6 +79,19 @@ for f in sorted(os.listdir(src)):
         print('installed', f)
 
 
+def unlit(name, rgb):
+    """An HDRP Unlit material (a copy of VQ1Hologram's Faint Cyan.mat) in one flat colour: no light changes it."""
+    path = f'{mats}/{name}.mat'
+    template = project + '/Assets/VQ1Hologram/Generated/Faint Cyan.mat'
+    s = open(template, encoding='utf-8', newline='').read()
+    s = s.replace('m_Name: Faint Cyan', 'm_Name: ' + name)
+    for key in ('_UnlitColor', '_Color'):
+        s, n = re.subn(r'    - %s: \{r: [^}]*\}' % key, '    - %s: {r: %s, g: %s, b: %s, a: 1}' % ((key,) + rgb), s)
+        assert n == 1, key
+    open(path, 'w', encoding='utf-8', newline='').write(s)
+    return write_meta(path, template + '.meta')
+
+
 def textured(name, texture, smoothness, metallic):
     """White-tinted, so the texture gives the colour."""
     return material(name, (1, 1, 1), tex.get(texture), tex.get(texture + '_N'), smoothness, metallic)
@@ -94,8 +107,10 @@ mapping = {
     'Solar': textured('StorySolar', 'Tex_Solar', 0.85, 0.3),
     'PCB': textured('StoryPCB', 'Tex_PCB', 0.5, 0.2),
     'Glass': material('AIRIGlass', (0.16, 0.22, 0.27), smoothness=0.92, metallic=0.4),
-    'TextFace': dark,                                            # headlines: faces in the UTCN logo's grey...
-    'TextSide': material('Concrete', (0.46, 0.46, 0.48)),        # ...lighter sides, so the depth of the letters reads
+    # Headlines: black faces, unlit, since the spots light the stage past white and even a near-black lit face came out
+    # grey; dark grey lit sides, so the letters stand out hard against the white and their depth still reads.
+    'TextFace': unlit('StoryInk', (0.02, 0.02, 0.022)),
+    'TextSide': material('StoryInkSide', (0.13, 0.13, 0.14), smoothness=0.15, metallic=0.0),
 }
 
 template = open(models + '/UTCN/UTCN.fbx.meta', encoding='utf-8', newline='').read()

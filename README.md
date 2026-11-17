@@ -52,7 +52,13 @@ Press **H** in the app to show them on screen.
 | Enter | play the AIRI × UTCN spot (83 s) |
 | M | play the AI for health spot with the OCT retina (22 s) |
 | Esc | skip the story to its end (the logos) |
-| L, or 4 fingers held still for 2 s | start or leave the AIRI exhibit (opening, then research by touch) |
+| Numpad 1 | the planet and asteroids (as Tab) |
+| Numpad 2 | the AIRI × UTCN spot (as Enter), from any experience |
+| Numpad 3 | the AI for health spot (as M), from any experience |
+| Numpad 4 | the model showcase, fresh: every object where it was saved (place, size, angle, spin, animation) |
+| Numpad 5 | the ChemiNova presentation: the showcase, fresh, on the shoe + Palchetto (see `Assets/Cheminova/README.md`) |
+| Numpad 6, or 4 fingers held still for 2 s | the AIRI exhibit: official opening, then research by touch (`HoloLab.cs`). Esc or the four fingers again leave it. |
+| Numpad 7 | Wake the Lab, the playful touch games (`PlayLab.cs`: the building raised floor by floor, then Play the lab: heart, engine, moons, stallion, globe; or AIRI Research). Esc leaves. |
 | Tab | next experience: model showcase ↔ asteroid orbits (VQ1 / VN3) |
 | ← / → | previous / next object |
 | Drag (finger or mouse) | turn (sideways) / tilt (up-down) |
@@ -167,19 +173,19 @@ In HLD Author: **Videos → Import**, then **Export** for the display (HLD 27" /
 
 ## The AIRI exhibit: opening and research, by touch
 
-Press **L**, or hold **four fingers still for 2 seconds**, to start it or leave it (Esc leaves too). It is built at runtime by `Assets/Hololuminescent/Scripts/HoloLab.cs` from the showcase's models and the story's department models. Its 3D headlines and labels (`Lab_*`, `Hint_*`, `Label_*`, `Title_*`) come from `make_story_assets.py`.
+Press **numpad 6** (from any experience), or hold **four fingers still for 2 seconds**, to start it; Esc or the four fingers again leave it. It is built at runtime by `Assets/Hololuminescent/Scripts/HoloLab.cs` from the showcase's models and the story's department models. Its 3D headlines and labels (`Lab_*`, `Hint_*`, `Label_*`, `Title_*`) come from `make_story_assets.py`.
 
 **The official opening** is also the resting state. It shows the AIRI building on its lawn with trees and lamps, and a red ribbon between two posts before the door: *Official opening*. A **swipe across the ribbon** cuts it:
 1. The halves swing down from the posts, the bow drops and confetti falls.
 2. **The red carpet rolls out** from the door toward the guests.
 3. *Welcome to AIRI* appears; a tap (or 12 s) moves on.
 
-**Explore AIRI research** is a carousel of seven research areas. **Swipe** to turn it; a flick keeps it going and it settles on one. Its name shows under the front exhibit, and a **tap** opens it. Every exhibit has **BACK** at the bottom. After a demonstration finishes, *Demonstration complete* shows and the carousel returns.
+**Explore AIRI research** is a carousel of seven research areas. **Swipe** to turn it; a flick keeps it going and it settles on one. Its name shows under the front exhibit, and a **tap** opens it. Every exhibit has **BACK** at the bottom. After a demonstration finishes, its hint goes and the carousel returns.
 
 | Exhibit | By touch |
 |---|---|
 | **AI for health** | The heart. Drag to turn it, spread two fingers to open it, tap a part to name it: valves (once open), heart wall, coronary vessels. |
-| **Robotics & IoT** | Drag sideways to turn the arm and down to lower it. It grips the crate when the hand reaches it; set the crate on the red pad. |
+| **Robotics & IoT** | Drag sideways to turn the arm and down to lower it. Over the crate it grips it; lift it (drag up), swing round and lower it again to set it down. Near the red pad (it pulses when the crate is over it) the crate lands on it; elsewhere it waits on the floor to be picked up again. |
 | **Autonomous systems** | Draw a flight path with one finger; the drone flies it. |
 | **Cybersecurity** | Traffic flows to the padlock. Tap the red packets to intercept them and leave the graphite (legitimate) traffic alone; twelve fill the shield. |
 | **5G-SHARE** | Drag from the mast to each of the four campuses; data then runs along the links. |

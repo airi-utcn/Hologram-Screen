@@ -129,6 +129,7 @@ public class StoryDirector : MonoBehaviour
     {
         StopAllCoroutines();
         FiveGLogo.Show(false);
+        StageGrade.Show(false);
         running = false;
         foreach (var go in spawned) if (go != null) Destroy(go);
         spawned.Clear();
@@ -168,6 +169,7 @@ public class StoryDirector : MonoBehaviour
         if (display != null) display.HelpVisible = false;
         Measure();
         AddKeyLight();
+        StageGrade.Show(true);   // the alcove's grade lifted the blacks into grey
         var ledge = GameObject.Find("Ledge");
         ledgeLook = ledge != null ? ledge.GetComponent<Renderer>() : null;
         if (ledgeLook != null) ledgeLook.enabled = false;
@@ -1302,6 +1304,7 @@ public class StoryDirector : MonoBehaviour
     {
         var go = Load("Story/" + name, Quaternion.Euler(0f, 180f, 0f));
         var parts = Parts(go);
+        foreach (var r in parts) r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;   // only objects throw shadows
         if (parts.Length == 0) return go;
         Bounds b = GesturePlayer.GetBounds(parts);
         // One type size for every headline (a layout grid, not fill-the-box), smaller for the tracked department names;

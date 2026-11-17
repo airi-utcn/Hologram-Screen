@@ -82,7 +82,8 @@ namespace VQ1Hologram
             discovery.text="ASTEROID DESCOPERIT ÎN PROIECTUL NEARBY";
             AddProjectLogo();
             progress=Line("Chapter progress",transform,dim,4,.006f,false);
-            progress.SetPositions(new[]{new Vector3(-1.1f,.4f,-4.8f),new Vector3(1.1f,.4f,-4.8f),new Vector3(1.1f,.42f,-4.8f),new Vector3(-1.1f,.42f,-4.8f)});
+            // Under the source line (centred at .44, .16 high), not through it.
+            progress.SetPositions(new[]{new Vector3(-1.1f,.26f,-4.8f),new Vector3(1.1f,.26f,-4.8f),new Vector3(1.1f,.28f,-4.8f),new Vector3(-1.1f,.28f,-4.8f)});
             progress.loop=true;
             solar=Group("Orbital theatre",new Vector3(0,3.03f,-3.8f));
             asteroidOrbitLine=OrbitLine("Asteroid orbit",orbit,solar,amber);
@@ -188,7 +189,8 @@ namespace VQ1Hologram
             text.rectTransform.sizeDelta=new Vector2(width,height);text.alignment=TextAlignmentOptions.Center;
             text.textWrappingMode=TextWrappingModes.NoWrap;text.overflowMode=TextOverflowModes.Overflow;
             var textMat=new Material(font.material);ownedMaterials.Add(textMat);
-            textMat.SetColor("_FaceColor",mat==cyan?new Color(.2f,.85f,1):new Color(.8f,.94f,1));
+            // Keep labels and their associated bodies/lines on the same palette.
+            textMat.SetColor("_FaceColor",mat.GetColor("_UnlitColor"));
             text.fontSharedMaterial=textMat;return text;
         }
         void SetChapter(int index)
@@ -224,7 +226,7 @@ namespace VQ1Hologram
             float reveal=automatic?Mathf.Min(Mathf.SmoothStep(0,1,chapterTime/1.2f),Mathf.SmoothStep(0,1,(chapterSeconds-chapterTime)/1.2f)):1;
             foreach(var obj in chapterObjects)obj.localScale=Vector3.one*Mathf.Lerp(.02f,1,reveal);
             float end=Mathf.Lerp(-1.1f,1.1f,Mathf.Clamp01(chapterTime/chapterSeconds));
-            progress.SetPosition(1,new Vector3(end,.4f,-4.8f));progress.SetPosition(2,new Vector3(end,.42f,-4.8f));
+            progress.SetPosition(1,new Vector3(end,.26f,-4.8f));progress.SetPosition(2,new Vector3(end,.28f,-4.8f));
             float creditPhase=chapterTime/Mathf.Max(chapterSeconds,.01f);
             detail.text=creditPhase<.3f?descriptions[ViewIndex].Replace("2018 VQ1",AsteroidName):(useVN3?vn3TeamPages:teamPages)[creditPhase<.65f?0:1];
             clock.text=ViewIndex==0?$"{Math.Round(orbit.Period):F0} ZILE ÎNTR-O PRIVIRE • TIMP ACCELERAT":$"ÎNCLINARE FAȚĂ DE ECLIPTICĂ: {orbit.i:F3}°";

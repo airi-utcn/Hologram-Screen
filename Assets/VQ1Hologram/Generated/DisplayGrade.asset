@@ -305,7 +305,7 @@ MonoBehaviour:
     m_Value: 1.1
   intensity:
     m_OverrideState: 1
-    m_Value: 0.17
+    m_Value: 0
   scatter:
     m_OverrideState: 1
     m_Value: 0.7
@@ -451,4 +451,4 @@ MonoBehaviour:
     m_Value: 0.5
   outsideColor:
     m_OverrideState: 1
-    m_Value: {r: 0, g: 0, b: 0, a: 1}
+    m_Value: {r: 1, g: 1, b: 1, a: 1}
